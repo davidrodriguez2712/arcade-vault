@@ -8,11 +8,12 @@ export default function SiteNav() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
 
-  const isActive = (name: "inicio" | "biblioteca" | "salon" | "auth") => {
+  const isActive = (name: "inicio" | "biblioteca" | "salon" | "acerca" | "auth") => {
     if (name === "inicio") return pathname === "/";
     if (name === "biblioteca")
       return pathname === "/biblioteca" || pathname.startsWith("/juego");
     if (name === "salon") return pathname === "/salon";
+    if (name === "acerca") return pathname === "/acerca";
     return pathname === "/entrar";
   };
 
@@ -40,6 +41,9 @@ export default function SiteNav() {
           </Link>
           <Link className={isActive("salon") ? "active" : ""} href="/salon" onClick={close}>
             Salón de la Fama
+          </Link>
+          <Link className={isActive("acerca") ? "active" : ""} href="/acerca" onClick={close}>
+            Acerca de
           </Link>
         </div>
         <div className="spacer"></div>
@@ -75,6 +79,9 @@ export default function SiteNav() {
         </Link>
         <Link className={isActive("salon") ? "active" : ""} href="/salon" onClick={close}>
           Salón de la Fama
+        </Link>
+        <Link className={isActive("acerca") ? "active" : ""} href="/acerca" onClick={close}>
+          Acerca de
         </Link>
         <Link className={isActive("auth") ? "active" : ""} href="/entrar" onClick={close}>
           Iniciar Sesión
