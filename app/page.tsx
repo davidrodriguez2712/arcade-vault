@@ -1,21 +1,19 @@
 import type { Metadata } from "next";
-import GameLibrary from "@/app/components/game-library";
+import HomeLanding from "@/app/components/home-landing";
+import { GAMES } from "@/app/lib/games";
+import { HOME_STATS, tickerRows, topPlayers } from "@/app/lib/home";
 
 export const metadata: Metadata = {
-  title: "Arcade Vault · Biblioteca",
+  title: "Arcade Vault · Inicio",
 };
 
 export default function Home() {
   return (
-    <div className="fade-in">
-      <section className="av-hero">
-        <h1 className="flicker">ARCADE VAULT</h1>
-        <div className="sub">
-          INSERTA UNA MONEDA PARA JUGAR <span className="blink">_</span>
-        </div>
-      </section>
-
-      <GameLibrary />
-    </div>
+    <HomeLanding
+      previewGames={GAMES.slice(0, 6)}
+      stats={HOME_STATS}
+      ticker={tickerRows()}
+      top={topPlayers()}
+    />
   );
 }

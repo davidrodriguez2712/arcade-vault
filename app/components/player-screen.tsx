@@ -148,7 +148,7 @@ export default function PlayerScreen({ gameId, title }: PlayerScreenProps) {
               </button>
               <button
                 className="btn magenta"
-                onClick={() => router.push("/")}
+                onClick={() => router.push("/biblioteca")}
               >
                 VOLVER AL VAULT
               </button>
