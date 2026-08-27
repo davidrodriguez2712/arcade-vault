@@ -1,69 +1,104 @@
-import Image from "next/image";
+import { CATS, GAMES } from "@/app/lib/games";
 
 export default function Home() {
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
-          </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
-          </p>
+    <>
+      <nav className="av-nav">
+        <div className="logo">
+          <div className="logo-mark" />
+          <div className="logo-text neon-cyan">
+            ARCADE <span className="neon-magenta">VAULT</span>
+          </div>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
+        <div className="links">
+          <a className="active">Biblioteca</a>
+          <a>Salón de la Fama</a>
+        </div>
+        <div className="spacer" />
+        <div className="coin-counter">
+          <span className="coin" />
+          <span>CRÉDITOS · 03</span>
+        </div>
+        <button className="btn auth-btn">Iniciar Sesión</button>
+        <button className="btn ghost hamburger" aria-label="Menú">
+          ≡
+        </button>
+      </nav>
+
+      <main className="av-main">
+        <div className="fade-in">
+          <section className="av-hero">
+            <h1 className="flicker">ARCADE VAULT</h1>
+            <div className="sub">
+              INSERTA UNA MONEDA PARA JUGAR <span className="blink">_</span>
+            </div>
+          </section>
+
+          <div className="av-filters">
+            <div className="av-search">
+              <span className="ico">⌕</span>
+              <input placeholder="Buscar un juego por nombre…" />
+            </div>
+            <div className="av-chips">
+              {CATS.map((c) => (
+                <button
+                  key={c}
+                  className={"chip" + (c === "TODOS" ? " active" : "")}
+                >
+                  {c}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="av-grid">
+            {GAMES.map((game) => (
+              <div key={game.id} className="card">
+                <div className="cover">
+                  <div className={"cover-bg " + game.cover} />
+                  <div className="label">{game.cat}</div>
+                </div>
+                <div className="meta">
+                  <div className="title">{game.title}</div>
+                  <div className="desc">{game.short}</div>
+                  <div className="row">
+                    <div className="score-badge">
+                      <span>MEJOR PUNTUACIÓN</span>
+                      <b>{game.best.toLocaleString("es-ES")}</b>
+                    </div>
+                    <button
+                      className={
+                        "btn" +
+                        (game.color === "magenta"
+                          ? " magenta"
+                          : game.color === "yellow"
+                            ? " yellow"
+                            : "")
+                      }
+                    >
+                      JUGAR
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
         </div>
       </main>
-    </div>
+
+      <footer
+        style={{
+          borderTop: "1px solid var(--line)",
+          padding: "20px 32px",
+          textAlign: "center",
+          color: "var(--ink-faint)",
+          fontFamily: "var(--mono)",
+          fontSize: 11,
+          letterSpacing: "0.16em",
+        }}
+      >
+        © 2026 ARCADE VAULT · HECHO CON PIXELES Y NEÓN
+      </footer>
+    </>
   );
 }

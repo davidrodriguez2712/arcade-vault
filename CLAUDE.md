@@ -39,6 +39,9 @@ No test runner is configured.
 - **TypeScript strict**, `@/*` path alias maps to the project root.
 - Route-typed globals like `LayoutProps<"/">` / `PageProps` are generated into `.next/types` — use them directly, don't import from `next`.
 
+## Skills
+Usa siempre /frontend-design para diseñar la interfaz de usuario
+
 ## The managed agent-rules block
 
 The marked block in `AGENTS.md` is auto-generated and re-added by `next dev` (`node_modules/next/dist/server/lib/generate-agent-files.js`). Commit it together with your changes so the working tree stays clean; deleting it from a diff just recreates the uncommitted change.

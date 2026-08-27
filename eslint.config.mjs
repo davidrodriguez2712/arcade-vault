@@ -12,6 +12,8 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // Vendored HTML/JSX design template — reference only, not part of the build.
+    "references/**",
   ]),
 ]);
 
