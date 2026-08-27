@@ -1,6 +1,6 @@
 # SPEC 01 — MVP de interfaz visual: las 5 pantallas de Arcade Vault
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** —
 > **Fecha:** 2026-08-27
 > **Objetivo:** Implementar como rutas de Next las 5 pantallas del prototipo de `references/templates/` (biblioteca, detalle, reproductor, autenticación y salón de la fama), solo la capa visual, sin lógica de juego ni backend.
