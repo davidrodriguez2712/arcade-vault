@@ -12,7 +12,7 @@ export default function AuthCard() {
 
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
-    router.push("/");
+    router.push("/biblioteca");
   };
 
   return (
@@ -84,17 +84,17 @@ export default function AuthCard() {
       <button
         className="btn ghost"
         style={{ width: "100%", marginTop: 10 }}
-        onClick={() => router.push("/")}
+        onClick={() => router.push("/biblioteca")}
       >
         JUGAR COMO INVITADO
       </button>
 
       <div className="auth-divider">O CONTINÚA CON</div>
       <div className="social">
-        <button className="btn ghost" type="button" onClick={() => router.push("/")}>
+        <button className="btn ghost" type="button" onClick={() => router.push("/biblioteca")}>
           ◆  GOOGLE
         </button>
-        <button className="btn ghost" type="button" onClick={() => router.push("/")}>
+        <button className="btn ghost" type="button" onClick={() => router.push("/biblioteca")}>
           ▣  GITHUB
         </button>
       </div>
