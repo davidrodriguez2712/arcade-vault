@@ -39,6 +39,7 @@ No test runner is configured.
 - **TypeScript strict**, `@/*` path alias maps to the project root.
 - Route-typed globals like `LayoutProps<"/">` / `PageProps` are generated into `.next/types` — use them directly, don't import from `next`.
 - **Supabase** via `@supabase/ssr`: clients in `app/lib/supabase/` (`client.ts` browser, `server.ts` server), session refresh in root `proxy.ts` (Next 16 renamed `middleware` → `proxy`). Env vars `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local` (see `.env.example`). Schema lives in `supabase/migrations/`, applied via the Supabase MCP. Smoke test: `/diagnostico/supabase`.
+- **Real games** live in `app/components/games/<game>/` as a framework-agnostic `engine.ts` (canvas game loop, no React/Next imports) plus a thin `"use client"` wrapper. Registered by game id in `app/components/games/registry.ts` (`REAL_GAME_PLAYERS`); `/juego/[id]/jugar` renders the real player when registered, otherwise the simulated `PlayerScreen`. First one: `asteroids` → `rocas`.
 
 ## Skills
 

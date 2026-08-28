@@ -1,5 +1,4 @@
 export type GameColor = "cyan" | "magenta" | "yellow" | "green";
-
 export interface Game {
   id: string;
   title: string;
@@ -11,9 +10,7 @@ export interface Game {
   best: number;
   plays: string;
 }
-
 export const CATS = ["TODOS", "ARCADE", "PUZZLE", "SHOOTER", "VERSUS"] as const;
-
 export const GAMES: Game[] = [
   {
     id: "bloque-buster",
@@ -74,7 +71,7 @@ export const GAMES: Game[] = [
     id: "rocas",
     title: "ROCAS",
     short: "Pulveriza asteroides en gravedad cero.",
-    long: "Tu nave triangular flota en vacío absoluto. Dispara y rota para dividir rocas en fragmentos cada vez más pequeños. Cuidado con los OVNIs en el horizonte.",
+    long: "Tu nave triangular flota en vacío absoluto. Dispara y rota para dividir rocas en fragmentos cada vez más pequeños. Recoge el potenciador 3x para desatar el disparo triple.",
     cat: "SHOOTER",
     cover: "cover-rocas",
     color: "yellow",
