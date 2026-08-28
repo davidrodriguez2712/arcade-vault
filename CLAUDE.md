@@ -38,8 +38,10 @@ No test runner is configured.
 - **Tailwind CSS v4**, CSS-first config: `@import "tailwindcss"` and `@theme` live in `app/globals.css`; there is no `tailwind.config`. PostCSS via `@tailwindcss/postcss`.
 - **TypeScript strict**, `@/*` path alias maps to the project root.
 - Route-typed globals like `LayoutProps<"/">` / `PageProps` are generated into `.next/types` — use them directly, don't import from `next`.
+- **Supabase** via `@supabase/ssr`: clients in `app/lib/supabase/` (`client.ts` browser, `server.ts` server), session refresh in root `proxy.ts` (Next 16 renamed `middleware` → `proxy`). Env vars `NEXT_PUBLIC_SUPABASE_URL` / `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in `.env.local` (see `.env.example`). Schema lives in `supabase/migrations/`, applied via the Supabase MCP. Smoke test: `/diagnostico/supabase`.
 
 ## Skills
+
 Usa siempre /frontend-design para diseñar la interfaz de usuario
 
 ## The managed agent-rules block
