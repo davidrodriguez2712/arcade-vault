@@ -1,6 +1,6 @@
 // Tipos generados con `mcp__supabase__generate_typescript_types` (proyecto itmhyidlxraapcjzprvn).
 // Regenerar este archivo cada vez que cambie el esquema (tablas, vistas, enums, funciones).
-// Hoy no hay tablas: `Database["public"]["Tables"]` está vacío.
+// SPEC 06: tablas `games` (catálogo) y `scores` (leaderboard).
 export type Json =
   | string
   | number
@@ -16,7 +16,86 @@ export type Database = {
   };
   public: {
     Tables: {
-      [_ in never]: never;
+      games: {
+        Row: {
+          best: number;
+          cat: string;
+          color: string;
+          cover: string;
+          created_at: string;
+          has_leaderboard: boolean;
+          id: string;
+          long: string;
+          plays: string;
+          short: string;
+          sort_order: number;
+          title: string;
+        };
+        Insert: {
+          best?: number;
+          cat: string;
+          color: string;
+          cover: string;
+          created_at?: string;
+          has_leaderboard?: boolean;
+          id: string;
+          long: string;
+          plays?: string;
+          short: string;
+          sort_order: number;
+          title: string;
+        };
+        Update: {
+          best?: number;
+          cat?: string;
+          color?: string;
+          cover?: string;
+          created_at?: string;
+          has_leaderboard?: boolean;
+          id?: string;
+          long?: string;
+          plays?: string;
+          short?: string;
+          sort_order?: number;
+          title?: string;
+        };
+        Relationships: [];
+      };
+      scores: {
+        Row: {
+          created_at: string;
+          game_id: string;
+          id: string;
+          level: number;
+          name: string;
+          score: number;
+        };
+        Insert: {
+          created_at?: string;
+          game_id: string;
+          id?: string;
+          level?: number;
+          name: string;
+          score: number;
+        };
+        Update: {
+          created_at?: string;
+          game_id?: string;
+          id?: string;
+          level?: number;
+          name?: string;
+          score?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "scores_game_id_fkey";
+            columns: ["game_id"];
+            isOneToOne: false;
+            referencedRelation: "games";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: {
       [_ in never]: never;
