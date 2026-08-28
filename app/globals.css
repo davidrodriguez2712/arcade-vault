@@ -1289,3 +1289,52 @@ a { color: inherit; text-decoration: none; }
 .term-body .dim { color: var(--ink-dim); }
 .term-body .success { margin-top: 12px; color: var(--green); text-shadow: 0 0 6px rgba(0,255,136,0.45); font-weight: 700; white-space: pre-wrap; }
 .term-body .caret { animation: blink 1s steps(1) infinite; }
+
+/* ===== juego: asteroides (rocas) ===== */
+.asteroids-stage {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+.asteroids-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  touch-action: none;
+}
+.asteroids-touch {
+  position: absolute;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+  z-index: 4;
+}
+@media (pointer: coarse) {
+  .asteroids-touch { display: block; }
+}
+.asteroids-touch-btn {
+  position: absolute;
+  bottom: 18px;
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 1px solid var(--cyan);
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--cyan);
+  font-family: var(--pixel);
+  font-size: 16px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.asteroids-touch-btn:active { background: rgba(0, 245, 255, 0.28); }
+.asteroids-touch-btn.left { left: 16px; }
+.asteroids-touch-btn.right { left: 88px; }
+.asteroids-touch-btn.thrust { right: 88px; }
+.asteroids-touch-btn.fire { right: 16px; border-color: var(--magenta); color: var(--magenta); }
