@@ -1,28 +1,33 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { GAMES } from "@/app/lib/games";
-import { seededScores } from "@/app/lib/scores";
-
-export function generateStaticParams() {
-  return GAMES.map((g) => ({ id: g.id }));
+import { FALLBACK_GAME_IDS, getGame, getGames } from "@/app/lib/games";
+import { getTopScores, seededScores } from "@/app/lib/scores";
+// Marcas reales (rocas) refrescadas por ISR además de por `revalidatePath` al guardar.
+export const revalidate = 60;
+export async function generateStaticParams() {
+  const games = await getGames();
+  const ids = games.length ? games.map((g) => g.id) : [...FALLBACK_GAME_IDS];
+  return ids.map((id) => ({ id }));
 }
-
 export async function generateMetadata({
   params,
 }: PageProps<"/juego/[id]">): Promise<Metadata> {
   const { id } = await params;
-  const game = GAMES.find((g) => g.id === id);
-  return { title: game ? `${game.title} · Arcade Vault` : "Juego no encontrado" };
+  const game = await getGame(id);
+  return {
+    title: game ? `${game.title} · Arcade Vault` : "Juego no encontrado",
+  };
 }
-
-export default async function GameDetailPage({ params }: PageProps<"/juego/[id]">) {
+export default async function GameDetailPage({
+  params,
+}: PageProps<"/juego/[id]">) {
   const { id } = await params;
-  const game = GAMES.find((g) => g.id === id);
+  const game = await getGame(id);
   if (!game) notFound();
-
-  const scores = seededScores(id.length * 17 + 3, 10);
-
+  const scores = game.hasLeaderboard
+    ? await getTopScores(id, 10)
+    : seededScores(id.length * 17 + 3, 10);
   return (
     <div className="av-detail fade-in">
       <div>
@@ -47,7 +52,10 @@ export default async function GameDetailPage({ params }: PageProps<"/juego/[id]"
               <div className="l">Mejor global</div>
               <div
                 className="v"
-                style={{ color: "var(--magenta)", textShadow: "0 0 6px rgba(255,0,110,0.5)" }}
+                style={{
+                  color: "var(--magenta)",
+                  textShadow: "0 0 6px rgba(255,0,110,0.5)",
+                }}
               >
                 {game.best.toLocaleString("es-ES")}
               </div>
@@ -56,7 +64,10 @@ export default async function GameDetailPage({ params }: PageProps<"/juego/[id]"
               <div className="l">Dificultad</div>
               <div
                 className="v"
-                style={{ color: "var(--yellow)", textShadow: "0 0 6px rgba(245,255,0,0.5)" }}
+                style={{
+                  color: "var(--yellow)",
+                  textShadow: "0 0 6px rgba(245,255,0,0.5)",
+                }}
               >
                 ★ ★ ★ ☆ ☆
               </div>
@@ -64,7 +75,7 @@ export default async function GameDetailPage({ params }: PageProps<"/juego/[id]"
           </div>
           <div className="detail-actions">
             <Link className="btn xl pulse" href={`/juego/${game.id}/jugar`}>
-              ▶  JUGAR AHORA
+              ▶ JUGAR AHORA
             </Link>
             <Link className="btn ghost lg" href="/biblioteca">
               VOLVER AL VAULT
@@ -72,10 +83,15 @@ export default async function GameDetailPage({ params }: PageProps<"/juego/[id]"
           </div>
         </div>
       </div>
-
       <aside>
         <div className="leaderboard">
           <h3>MEJORES PUNTUACIONES</h3>
+          {scores.length === 0 && (
+            <div className="lb-empty">
+              AÚN NO HAY MARCAS
+              <span>SÉ EL PRIMERO EN PUNTUAR</span>
+            </div>
+          )}
           {scores.map((r, i) => (
             <div
               key={r.name}

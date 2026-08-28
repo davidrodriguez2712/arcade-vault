@@ -1,23 +1,19 @@
 "use client";
-
 import { useMemo, useState } from "react";
-import { CATS, GAMES } from "@/app/lib/games";
+import { CATS, type Game } from "@/app/lib/games";
 import GameCard from "./game-card";
-
-export default function GameLibrary() {
+export default function GameLibrary({ games }: { games: Game[] }) {
   const [q, setQ] = useState("");
   const [cat, setCat] = useState<(typeof CATS)[number]>("TODOS");
-
   const filtered = useMemo(
     () =>
-      GAMES.filter(
+      games.filter(
         (g) =>
           (cat === "TODOS" || g.cat === cat) &&
           g.title.toLowerCase().includes(q.toLowerCase()),
       ),
-    [q, cat],
+    [q, cat, games],
   );
-
   return (
     <>
       <div className="av-filters">
@@ -41,7 +37,6 @@ export default function GameLibrary() {
           ))}
         </div>
       </div>
-
       <div className="av-grid">
         {filtered.map((g) => (
           <GameCard key={g.id} game={g} />
@@ -57,7 +52,11 @@ export default function GameLibrary() {
           >
             <div
               className="pixel"
-              style={{ fontSize: 14, color: "var(--magenta)", marginBottom: 12 }}
+              style={{
+                fontSize: 14,
+                color: "var(--magenta)",
+                marginBottom: 12,
+              }}
             >
               NO HAY RESULTADOS
             </div>

@@ -11,6 +11,13 @@ interface Vec {
   y: number;
 }
 const wrap = (v: number, max: number): number => ((v % max) + max) % max;
+// ¿El foco está en un campo de formulario? Se usa para no capturar el teclado
+// del juego mientras el jugador escribe (overlay de fin de partida).
+const isFormFieldFocused = (target: EventTarget | null): boolean => {
+  const el = target instanceof HTMLElement ? target : null;
+  const tag = el?.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+};
 const dist = (a: Vec, b: Vec): number => Math.hypot(a.x - b.x, a.y - b.y);
 const rand = (min: number, max: number): number =>
   min + Math.random() * (max - min);
@@ -292,6 +299,10 @@ export class Particle {
 }
 // ── Motor ────────────────────────────────────────────────────────────────────
 type GameState = "playing" | "dead" | "gameover";
+export interface GameOverResult {
+  score: number;
+  level: number;
+}
 export class AsteroidsGame {
   private canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
@@ -311,6 +322,9 @@ export class AsteroidsGame {
   private deadTimer = 0;
   private powerUpSpawned = false;
   private killsSinceSpawn = 0;
+  // Aviso de fin de partida al envoltorio React (una sola vez por partida).
+  private onGameOver: ((result: GameOverResult) => void) | null = null;
+  private gameOverNotified = false;
   // Input de teclado.
   private keys: Record<string, boolean> = {};
   private justPressed: Record<string, boolean> = {};
@@ -349,6 +363,16 @@ export class AsteroidsGame {
   // stop() + libera referencias. Idempotente.
   destroy(): void {
     this.stop();
+    this.onGameOver = null;
+  }
+  // Registra el callback de fin de partida. Se dispara una vez, al perder la
+  // última vida, con la puntuación y el nivel alcanzados.
+  setOnGameOver(cb: (result: GameOverResult) => void): void {
+    this.onGameOver = cb;
+  }
+  // Reinicia la partida desde cero (lo que hace `Espacio` en GAME OVER).
+  restart(): void {
+    this.initGame();
   }
   // Pausa lógica: el loop sigue pintando, pero no actualiza.
   setPaused(paused: boolean): void {
@@ -388,6 +412,10 @@ export class AsteroidsGame {
   }
   // ── Input ──────────────────────────────────────────────────────────────────
   private onKeyDown = (e: KeyboardEvent): void => {
+    // Ignora el teclado mientras se escribe en un campo (p. ej. las iniciales
+    // del overlay de fin de partida): así Espacio no reinicia ni las flechas
+    // mueven la nave mientras el jugador teclea su nombre.
+    if (isFormFieldFocused(e.target)) return;
     if (!this.keys[e.code]) this.justPressed[e.code] = true;
     this.keys[e.code] = true;
   };
@@ -425,6 +453,7 @@ export class AsteroidsGame {
     this.lives = 3;
     this.level = 1;
     this.state = "playing";
+    this.gameOverNotified = false;
     this.spawnAsteroids(4);
   }
   private nextLevel(): void {
@@ -446,6 +475,10 @@ export class AsteroidsGame {
     this.lives--;
     if (this.lives <= 0) {
       this.state = "gameover";
+      if (!this.gameOverNotified) {
+        this.gameOverNotified = true;
+        this.onGameOver?.({ score: this.score, level: this.level });
+      }
     } else {
       this.state = "dead";
       this.deadTimer = 2;
@@ -583,12 +616,8 @@ export class AsteroidsGame {
     this.bullets.forEach((b) => b.draw(ctx));
     this.ship.draw(ctx);
     this.drawHUD();
-    if (this.state === "gameover") {
-      this.drawOverlay(
-        "GAME OVER",
-        `PUNTAJE: ${this.score}   —   ESPACIO PARA REINICIAR`,
-      );
-    }
+    // El texto de GAME OVER lo pinta ahora el overlay React del envoltorio;
+    // aquí se sigue pintando el último frame congelado por debajo.
     if (this.paused && this.state !== "gameover") {
       this.drawOverlay("EN PAUSA", "ESC / P PARA CONTINUAR");
     }

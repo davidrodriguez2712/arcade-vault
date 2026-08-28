@@ -1,3 +1,5 @@
+import { cache } from "react";
+import { createPublicClient } from "./supabase/public";
 export type GameColor = "cyan" | "magenta" | "yellow" | "green";
 export interface Game {
   id: string;
@@ -9,95 +11,82 @@ export interface Game {
   color: GameColor;
   best: number;
   plays: string;
+  hasLeaderboard: boolean;
 }
 export const CATS = ["TODOS", "ARCADE", "PUZZLE", "SHOOTER", "VERSUS"] as const;
-export const GAMES: Game[] = [
-  {
-    id: "bloque-buster",
-    title: "BLOQUE BUSTER",
-    short: "Rebota la pelota y destruye muros de neón.",
-    long: "Pilota una nave-paleta y rebota un núcleo de plasma para pulverizar muros de bloques cromáticos. Cada nivel reorganiza la grilla en patrones imposibles. ¿Hasta dónde llegará tu racha?",
+// Slugs del catálogo. Respaldo para `getGames` / `generateStaticParams` cuando la
+// consulta a Supabase falla o vuelve vacía en build (evita romper el build por un
+// fallo de red). Deben coincidir con las filas sembradas en
+// `supabase/migrations/06-tabla-juegos-y-leaderboard.sql`.
+export const FALLBACK_GAME_IDS = [
+  "bloque-buster",
+  "caida",
+  "serpentina",
+  "gloton",
+  "invasores",
+  "rocas",
+  "ranaria",
+  "duelo-pixel",
+] as const;
+interface GameRow {
+  id: string;
+  title: string;
+  short: string;
+  long: string;
+  cat: string;
+  cover: string;
+  color: string;
+  best: number;
+  plays: string;
+  has_leaderboard: boolean;
+}
+function toGame(row: GameRow): Game {
+  return {
+    id: row.id,
+    title: row.title,
+    short: row.short,
+    long: row.long,
+    cat: row.cat,
+    cover: row.cover,
+    color: row.color as GameColor,
+    best: row.best,
+    plays: row.plays,
+    hasLeaderboard: row.has_leaderboard,
+  };
+}
+// Juego mínimo de respaldo: solo lo imprescindible para que las rutas existan si
+// Supabase no responde en build. `rocas` es el único con leaderboard hoy.
+function fallbackGame(id: string): Game {
+  return {
+    id,
+    title: id.replace(/-/g, " ").toUpperCase(),
+    short: "",
+    long: "",
     cat: "ARCADE",
-    cover: "cover-bricks",
+    cover: "",
     color: "cyan",
-    best: 28450,
-    plays: "12.4K",
-  },
-  {
-    id: "caida",
-    title: "CAÍDA",
-    short: "Encaja las piezas antes de que el techo te aplaste.",
-    long: "Piezas geométricas descienden desde la oscuridad. Rótalas, encástralas y limpia líneas para sobrevivir. La velocidad aumenta sin piedad cada 10 líneas.",
-    cat: "PUZZLE",
-    cover: "cover-tetro",
-    color: "magenta",
-    best: 184220,
-    plays: "31.8K",
-  },
-  {
-    id: "serpentina",
-    title: "SERPENTINA",
-    short: "Crece sin morder tu propia cola.",
-    long: "Una serpiente de luz recorre la grilla buscando núcleos magenta. Cada bocado la alarga y la hace más veloz. Un movimiento en falso y se devora a sí misma.",
-    cat: "ARCADE",
-    cover: "cover-snake",
-    color: "green",
-    best: 7820,
-    plays: "9.1K",
-  },
-  {
-    id: "gloton",
-    title: "GLOTÓN",
-    short: "Devora puntos y escapa de los fantasmas.",
-    long: "Un círculo glotón patrulla un laberinto coleccionando puntos luminosos. Cuatro espectros lo persiguen, pero cada cierto tiempo aparece una píldora que invierte los papeles.",
-    cat: "ARCADE",
-    cover: "cover-glot",
-    color: "yellow",
-    best: 96400,
-    plays: "27.2K",
-  },
-  {
-    id: "invasores",
-    title: "INVASORES",
-    short: "Defiende el planeta de filas alienígenas.",
-    long: "Olas de pixeles hostiles descienden formación tras formación. Mueve tu cañón en horizontal y abre fuego con precisión, antes de que toquen la superficie.",
-    cat: "SHOOTER",
-    cover: "cover-invaders",
-    color: "green",
-    best: 54190,
-    plays: "18.0K",
-  },
-  {
-    id: "rocas",
-    title: "ROCAS",
-    short: "Pulveriza asteroides en gravedad cero.",
-    long: "Tu nave triangular flota en vacío absoluto. Dispara y rota para dividir rocas en fragmentos cada vez más pequeños. Recoge el potenciador 3x para desatar el disparo triple.",
-    cat: "SHOOTER",
-    cover: "cover-rocas",
-    color: "yellow",
-    best: 41200,
-    plays: "15.6K",
-  },
-  {
-    id: "ranaria",
-    title: "RANARIA",
-    short: "Cruza la autopista de pixeles.",
-    long: "Salta entre carriles de coches a toda velocidad y troncos a la deriva en el río. Llega a los nenúfares antes de que se acabe el tiempo.",
-    cat: "ARCADE",
-    cover: "cover-rana",
-    color: "green",
-    best: 18900,
-    plays: "6.4K",
-  },
-  {
-    id: "duelo-pixel",
-    title: "DUELO PIXEL",
-    short: "Dos paletas. Una pelota. Reflejos máximos.",
-    long: "El duelo más puro: dos paletas verticales se enfrentan por rebotar una pelota luminosa. Modo solitario contra la CPU o partida local a dos jugadores.",
-    cat: "VERSUS",
-    cover: "cover-duelo",
-    color: "cyan",
-    best: 24,
-    plays: "4.2K",
-  },
-];
+    best: 0,
+    plays: "0",
+    hasLeaderboard: id === "rocas",
+  };
+}
+// Catálogo completo desde la tabla `games`, ordenado por `sort_order`.
+// `cache()` deduplica la consulta dentro de un mismo render.
+export const getGames = cache(async (): Promise<Game[]> => {
+  const supabase = createPublicClient();
+  const { data, error } = await supabase
+    .from("games")
+    .select(
+      "id, title, short, long, cat, cover, color, best, plays, has_leaderboard",
+    )
+    .order("sort_order", { ascending: true });
+  if (error || !data || data.length === 0) {
+    if (error) console.error("getGames:", error.message);
+    return FALLBACK_GAME_IDS.map(fallbackGame);
+  }
+  return data.map(toGame);
+});
+export async function getGame(id: string): Promise<Game | null> {
+  const games = await getGames();
+  return games.find((g) => g.id === id) ?? null;
+}
