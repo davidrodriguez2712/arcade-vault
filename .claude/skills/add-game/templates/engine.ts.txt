@@ -1,0 +1,226 @@
+// PLANTILLA — motor de un juego para Arcade Vault.
+//
+// Cópiala a app/components/games/<DIR>/engine.ts y sustituye:
+//   __NombreGame__  -> nombre de la clase (p. ej. TetrisGame)
+//   __W__ / __H__   -> espacio interno de coordenadas (p. ej. 300 / 600)
+//   TouchAction     -> unión real de acciones táctiles (o borra el bloque táctil)
+//
+// Reglas que NO se tocan:
+//  - Cero imports de "react" / "next".
+//  - Todo el estado de la partida vive en campos privados de la clase.
+//  - draw() nunca pinta el texto de "GAME OVER" (lo pone el overlay React).
+//  - dt capado a 50 ms.
+//  - resize() reaplica ctx.setTransform sobre el espacio interno fijo.
+
+const W = __W__;
+const H = __H__;
+
+// ¿El foco está en un campo de formulario? Para no capturar el teclado del juego
+// mientras el jugador escribe sus iniciales en el overlay de fin de partida.
+const isFormFieldFocused = (target: EventTarget | null): boolean => {
+  const el = target instanceof HTMLElement ? target : null;
+  const tag = el?.tagName;
+  return tag === "INPUT" || tag === "TEXTAREA" || tag === "SELECT";
+};
+
+// Acciones de los botones táctiles (borra esto y setInput() si el juego no usa táctiles).
+export type TouchAction = "left" | "right" | "thrust" | "fire";
+
+export interface GameOverResult {
+  score: number;
+  level: number;
+}
+
+type GameState = "playing" | "dead" | "gameover";
+
+export class __NombreGame__ {
+  private canvas: HTMLCanvasElement;
+  private ctx: CanvasRenderingContext2D;
+  private rafId: number | null = null;
+  private lastTime: number | null = null;
+  private paused = false;
+
+  // ── Estado de partida (porta aquí lo que en game.js eran globales) ──────────
+  private score = 0;
+  private lives = 3;
+  private level = 1;
+  private state: GameState = "playing";
+  // PORT: añade aquí las entidades del juego (piezas, tablero, pelota, bloques…).
+
+  // Aviso de fin de partida al envoltorio React (una sola vez por partida).
+  private onGameOver: ((result: GameOverResult) => void) | null = null;
+  private gameOverNotified = false;
+
+  // Input de teclado.
+  private keys: Record<string, boolean> = {};
+  private justPressed: Record<string, boolean> = {};
+
+  // Input táctil (se combina con el teclado en update()).
+  private touch: Record<TouchAction, boolean> = {
+    left: false,
+    right: false,
+    thrust: false,
+    fire: false,
+  };
+
+  constructor(canvas: HTMLCanvasElement) {
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw new Error("No se pudo obtener el contexto 2D del canvas.");
+    this.canvas = canvas;
+    this.ctx = ctx;
+  }
+
+  // Inicializa el estado, engancha el teclado y arranca el game loop. Idempotente.
+  start(): void {
+    if (this.rafId !== null) return;
+    this.initGame();
+    window.addEventListener("keydown", this.onKeyDown);
+    window.addEventListener("keyup", this.onKeyUp);
+    this.lastTime = null;
+    this.rafId = requestAnimationFrame(this.loop);
+  }
+
+  // Detiene el loop y quita los listeners; el estado se conserva.
+  stop(): void {
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
+    }
+    window.removeEventListener("keydown", this.onKeyDown);
+    window.removeEventListener("keyup", this.onKeyUp);
+  }
+
+  // stop() + libera referencias. Idempotente.
+  destroy(): void {
+    this.stop();
+    this.onGameOver = null;
+  }
+
+  // Se dispara una vez, al perder la última vida, con score y nivel alcanzados.
+  setOnGameOver(cb: (result: GameOverResult) => void): void {
+    this.onGameOver = cb;
+  }
+
+  // Reinicia la partida desde cero.
+  restart(): void {
+    this.initGame();
+  }
+
+  // Pausa lógica: el loop sigue pintando el último frame, pero no actualiza.
+  setPaused(paused: boolean): void {
+    this.paused = paused;
+  }
+
+  togglePause(): void {
+    if (this.state === "gameover") return;
+    this.paused = !this.paused;
+  }
+
+  // Ajusta el backing store al tamaño CSS del contenedor por el devicePixelRatio
+  // y deja una transform que mapea el espacio interno W x H sobre ese backing store.
+  resize(cssWidth: number, cssHeight: number, dpr: number): void {
+    const targetAspect = W / H;
+    let cw = cssWidth;
+    let ch = cssWidth / targetAspect;
+    if (ch > cssHeight) {
+      ch = cssHeight;
+      cw = cssHeight * targetAspect;
+    }
+    const pxW = Math.max(1, Math.round(cw * dpr));
+    const pxH = Math.max(1, Math.round(ch * dpr));
+    if (this.canvas.width !== pxW) this.canvas.width = pxW;
+    if (this.canvas.height !== pxH) this.canvas.height = pxH;
+    // Asignar width/height resetea la transform: se reaplica siempre.
+    this.ctx.setTransform(pxW / W, 0, 0, pxH / H, 0, 0);
+  }
+
+  // Entrada de los botones táctiles. Combina con el teclado en update().
+  // 'fire' se traduce a una pulsación de 'Space' en el flanco de subida.
+  setInput(action: TouchAction, pressed: boolean): void {
+    if (action === "fire") {
+      if (pressed && !this.touch.fire) this.justPressed["Space"] = true;
+      this.touch.fire = pressed;
+      return;
+    }
+    this.touch[action] = pressed;
+  }
+
+  // ── Input ──────────────────────────────────────────────────────────────────
+  private onKeyDown = (e: KeyboardEvent): void => {
+    if (isFormFieldFocused(e.target)) return;
+    if (!this.keys[e.code]) this.justPressed[e.code] = true;
+    this.keys[e.code] = true;
+  };
+
+  private onKeyUp = (e: KeyboardEvent): void => {
+    this.keys[e.code] = false;
+  };
+
+  // Consume la pulsación de un frame (una sola lectura).
+  private pressed(code: string): boolean {
+    const val = this.justPressed[code];
+    this.justPressed[code] = false;
+    return !!val;
+  }
+
+  // ── Ciclo de partida ───────────────────────────────────────────────────────
+  private initGame(): void {
+    this.score = 0;
+    this.lives = 3;
+    this.level = 1;
+    this.state = "playing";
+    this.gameOverNotified = false;
+    // PORT: reinicia aquí todas las entidades del juego.
+  }
+
+  // Llama a esto cuando el jugador pierde definitivamente.
+  private endGame(): void {
+    this.state = "gameover";
+    if (!this.gameOverNotified) {
+      this.gameOverNotified = true;
+      this.onGameOver?.({ score: this.score, level: this.level });
+    }
+  }
+
+  // ── Update ─────────────────────────────────────────────────────────────────
+  private update(dt: number): void {
+    if (this.state === "gameover") {
+      if (this.pressed("Space")) this.initGame();
+      return;
+    }
+    // PORT: mueve aquí la lógica de update(dt) del juego original.
+    //  - Lee el input así:
+    //      const left  = !!this.keys["ArrowLeft"]  || this.touch.left;
+    //      const right = !!this.keys["ArrowRight"] || this.touch.right;
+    //      const fire  = this.pressed("Space");
+    //  - Cuando el jugador pierde la última vida: this.endGame();
+  }
+
+  // ── Draw ───────────────────────────────────────────────────────────────────
+  private draw(): void {
+    const { ctx } = this;
+    ctx.fillStyle = "#000";
+    ctx.fillRect(0, 0, W, H);
+    // PORT: dibuja el campo, las entidades y el HUD (SCORE / NIVEL / vidas) en canvas.
+    if (this.paused && this.state !== "gameover") {
+      ctx.textAlign = "center";
+      ctx.fillStyle = "#fff";
+      ctx.font = "bold 46px monospace";
+      ctx.fillText("EN PAUSA", W / 2, H / 2 - 18);
+      ctx.font = "18px monospace";
+      ctx.fillStyle = "rgba(255,255,255,0.65)";
+      ctx.fillText("ESC / P PARA CONTINUAR", W / 2, H / 2 + 22);
+    }
+    // El texto de "GAME OVER" lo pinta el overlay React del envoltorio.
+  }
+
+  // ── Loop ───────────────────────────────────────────────────────────────────
+  private loop = (ts: number): void => {
+    const dt =
+      this.lastTime === null ? 0 : Math.min((ts - this.lastTime) / 1000, 0.05);
+    this.lastTime = ts;
+    if (!this.paused) this.update(dt);
+    this.draw();
+    this.rafId = requestAnimationFrame(this.loop);
+  };
+}

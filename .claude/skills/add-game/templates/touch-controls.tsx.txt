@@ -1,0 +1,52 @@
+// PLANTILLA — controles táctiles de un juego para Arcade Vault.
+//
+// Cópiala a app/components/games/<DIR>/touch-controls.tsx y sustituye:
+//   __NombreTouchControls__ -> nombre del componente
+//   __DIR__                 -> carpeta del componente (clase CSS .__DIR__-touch-btn)
+//   BUTTONS                 -> acciones reales del juego (deben existir en TouchAction)
+//
+// La visibilidad la controla el CSS: .__DIR__-touch { display: none }
+// y @media (pointer: coarse) { .__DIR__-touch { display: block } }.
+"use client";
+import type { PointerEvent } from "react";
+import type { TouchAction } from "./engine";
+
+interface __NombreTouchControls__Props {
+  onInput: (action: TouchAction, pressed: boolean) => void;
+}
+
+const BUTTONS: { action: TouchAction; glyph: string; label: string }[] = [
+  { action: "left", glyph: "◄", label: "Izquierda" },
+  { action: "right", glyph: "►", label: "Derecha" },
+  { action: "thrust", glyph: "▲", label: "Arriba" },
+  { action: "fire", glyph: "●", label: "Acción" },
+];
+
+export default function __NombreTouchControls__({
+  onInput,
+}: __NombreTouchControls__Props) {
+  const press = (action: TouchAction, pressed: boolean) => {
+    return (e: PointerEvent<HTMLButtonElement>) => {
+      e.preventDefault();
+      onInput(action, pressed);
+    };
+  };
+  return (
+    <div className="__DIR__-touch">
+      {BUTTONS.map(({ action, glyph, label }) => (
+        <button
+          key={action}
+          type="button"
+          className={`__DIR__-touch-btn ${action}`}
+          aria-label={label}
+          onPointerDown={press(action, true)}
+          onPointerUp={press(action, false)}
+          onPointerCancel={press(action, false)}
+          onPointerLeave={press(action, false)}
+        >
+          {glyph}
+        </button>
+      ))}
+    </div>
+  );
+}
