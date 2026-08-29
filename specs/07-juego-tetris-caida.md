@@ -1,6 +1,6 @@
 # SPEC 07 — Segundo juego real: Tetris en la entrada `caida` con leaderboard
 
-> **Estado:** Aprobado
+> **Estado:** Implementado
 > **Depende de:** SPEC 01, SPEC 05, SPEC 06
 > **Fecha:** 2026-08-28
 > **Objetivo:** Portar el Tetris vanilla de `references/started-games/03-tetris/` a un motor TypeScript agnóstico de framework montado en el marco CRT del reproductor, conectado a la entrada de catálogo `caida`, con panel lateral en canvas, controles táctiles y guardado real de puntuaciones bajo RLS.
