@@ -20,6 +20,8 @@ npx skills@latest add Klerith/fernando-skills
 
 Write a spec before implementing a feature.
 
+Para juegos nuevos el flujo es: agente `game-planner` (decide qué juego, ver `## Agents`) → `/add-game` (redacta e implementa la spec).
+
 ## Commands
 
 ```bash
@@ -44,11 +46,16 @@ No test runner is configured.
 - **Catalog & scores in Supabase.** The game catalog is the `games` table, read with `getGames()` / `getGame()` from `app/lib/games.ts` (`FALLBACK_GAME_IDS` keeps the build alive if the DB is unreachable). High scores are the `scores` table: anonymous initials-only inserts under RLS, gated to games with `games.has_leaderboard = true` (today: `rocas`, `caida`, `bloque-buster` and `serpentina`) and more (see '/references/implemented-games.md') when you need to check which games are implemented and how to implement new ones. `getTopScores()` / `seededScores()` in `app/lib/scores.ts` read them; `submitScore()` in `app/lib/scores-actions.ts` writes them and revalidates `/salon` + `/juego/[id]`. `/salon` also uses ISR (`revalidate = 60`). Games without a real engine still show `seededScores` mocks.
 - **Formulario de contacto** (`/acerca`): `POST /api/contacto` (`app/api/contacto/route.ts`) valida con `app/lib/contact.ts` (+ honeypot `company`) y envía el correo con **Resend** (`resend` dep, env `RESEND_API_KEY`, remitente `onboarding@resend.dev`).
 - **Real games** live in `app/components/games/<game>/` as a framework-agnostic `engine.ts` (canvas game loop, no React/Next imports) plus a thin `"use client"` wrapper. Cada juego trae además `touch-controls.tsx` para móvil. Registered by game id in `app/components/games/registry.ts` (`REAL_GAME_PLAYERS`); `/juego/[id]/jugar` renders the real player when registered, otherwise the simulated `PlayerScreen`. So far: `asteroids` → `rocas`, `tetris` → `caida` (480×600 internal space, board + side panel drawn on one canvas), `arkanoid` → `bloque-buster` (800×600 internal space, procedural neon render of the vanilla breakout, 5 levels, ends on 3 lives lost or level 5 cleared), `snake` → `serpentina` (800×600 internal space, 32×22 grid + 50px HUD band, dies on wall or self, speeds up every 4 fruits over 6 tiers; the fruit sprite is drawn from `public/games/serpentina/fruits.png` — the only binary asset in `public/` — with a procedural diamond fallback until it loads). On game over the engine fires `onGameOver`; the wrapper shows a React save overlay (canvas no longer draws its own GAME OVER text).
+
 ## Skills
 
 - `/frontend-design` — úsalo siempre para diseñar la interfaz de usuario. `/ui-ux-pro-max` para intel de UI/UX (estilos, paletas, tipografías, guías).
 - `/spec` + `/spec-impl` — Spec-Driven Design (redactar spec → aprobación → implementar).
 - `/add-game` (`.claude/skills/add-game/`) — añade un juego nuevo con su leaderboard: redacta la spec `NN-slug.md` (motor + tabla `scores` + cableado), espera aprobación, y la implementa paso a paso. El juego puede portarse desde `references/started-games/` o hacerse desde cero.
+
+## Agents
+
+- `game-planner` (`.claude/agents/game-planner.md`) — decide **qué** juego añadir a continuación y si encaja con la plataforma (categoría, estética CRT, motor agnóstico, puntuación para el leaderboard). Mantiene su memoria de sugerencias en `references/game-suggestion-todo.md`. Entrega el handoff a `/add-game`; no escribe specs ni código.
 
 ## The managed agent-rules block
 
