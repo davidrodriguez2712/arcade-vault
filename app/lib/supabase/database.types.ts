@@ -2,6 +2,7 @@
 // Regenerar este archivo cada vez que cambie el esquema (tablas, vistas, enums, funciones).
 // SPEC 06: tablas `games` (catálogo) y `scores` (leaderboard).
 // SPEC 08: regenerado tras activar `has_leaderboard` en `bloque-buster` (sin cambios de columnas).
+// SPEC 09: regenerado tras activar `has_leaderboard` en `serpentina` (sin cambios de columnas).
 export type Json =
   | string
   | number

@@ -2981,6 +2981,70 @@ a {
   left: 88px;
 }
 
+/* ===== juego: snake (serpentina) ===== */
+.snake-stage {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+.snake-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  touch-action: none;
+}
+.snake-touch {
+  position: absolute;
+  inset: 0;
+  display: none;
+  pointer-events: none;
+  z-index: 4;
+}
+@media (pointer: coarse) {
+  .snake-touch {
+    display: block;
+  }
+}
+.snake-touch-btn {
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  border: 1px solid var(--green);
+  background: rgba(0, 0, 0, 0.4);
+  color: var(--green);
+  font-family: var(--pixel);
+  font-size: 15px;
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  pointer-events: auto;
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.snake-touch-btn:active {
+  background: rgba(0, 255, 136, 0.28);
+}
+.snake-touch-btn.up {
+  right: 69px;
+  bottom: 142px;
+}
+.snake-touch-btn.down {
+  right: 69px;
+  bottom: 22px;
+}
+.snake-touch-btn.left {
+  right: 129px;
+  bottom: 82px;
+}
+.snake-touch-btn.right {
+  right: 9px;
+  bottom: 82px;
+}
+
 /* ===== leaderboard: estado vacío (SPEC 06) ===== */
 .lb-empty {
   display: flex;
