@@ -3066,3 +3066,36 @@ a {
   color: var(--ink-faint);
   text-shadow: none;
 }
+
+/* ===== skins (selector) ===== */
+.skin-picker {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  margin-top: 16px;
+}
+.skin-picker-btn {
+  padding: 6px 14px;
+  border: 1px solid var(--ink-faint);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--ink-dim);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    color 0.15s,
+    border-color 0.15s,
+    box-shadow 0.15s;
+}
+.skin-picker-btn:hover {
+  color: var(--ink);
+  border-color: var(--ink-dim);
+}
+.skin-picker-btn.is-active {
+  color: var(--cyan);
+  border-color: var(--cyan);
+  box-shadow: 0 0 8px rgba(0, 245, 255, 0.35);
+}

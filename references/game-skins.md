@@ -27,11 +27,11 @@ Skins:
 
 ## Infra compartida
 
-| Archivo                                   | Estado    |
-| ----------------------------------------- | --------- |
-| `app/components/games/skins.ts`           | Pendiente |
-| `app/components/games/skin-picker.tsx`    | Pendiente |
-| `app/globals.css` · bloque `.skin-picker` | Pendiente |
+| Archivo                                   | Estado |
+| ----------------------------------------- | ------ |
+| `app/components/games/skins.ts`           | Hecho  |
+| `app/components/games/skin-picker.tsx`    | Hecho  |
+| `app/globals.css` · bloque `.skin-picker` | Hecho  |
 
 La primera invocación del agente que implemente skins crea esta infra.
 
@@ -39,11 +39,11 @@ La primera invocación del agente que implemente skins crea esta infra.
 
 Fuente de la lista: `REAL_GAME_PLAYERS` en `app/components/games/registry.ts`.
 
-| ID              | Motor (`<DIR>`) | Skins      | Fecha | Notas |
-| --------------- | --------------- | ---------- | ----- | ----- |
-| `rocas`         | `asteroids`     | ❌ ninguna | —     |       |
-| `caida`         | `tetris`        | ❌ ninguna | —     |       |
-| `bloque-buster` | `arkanoid`      | ❌ ninguna | —     |       |
-| `serpentina`    | `snake`         | ❌ ninguna | —     |       |
+| ID              | Motor (`<DIR>`) | Skins                     | Fecha      | Notas                                                                                                                                                                                                                                                                 |
+| --------------- | --------------- | ------------------------- | ---------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `rocas`         | `asteroids`     | ✅ clasico + neon + retro | 2026-08-29 | Paleta `AsteroidsPalette` (11 roles): bg, ship, thruster, bullet, asteroid, particle (triple `r,g,b` para rgba con alfa), hud, hudDim, accent, overlayTitle, glow (shadowBlur). Las rocas, la nave, las balas y las vidas son wireframe; el power-up 3x usa `accent`. |
+| `caida`         | `tetris`        | ❌ ninguna                | —          |                                                                                                                                                                                                                                                                       |
+| `bloque-buster` | `arkanoid`      | ❌ ninguna                | —          |                                                                                                                                                                                                                                                                       |
+| `serpentina`    | `snake`         | ❌ ninguna                | —          |                                                                                                                                                                                                                                                                       |
 
 Leyenda de la columna **Skins**: `❌ ninguna` · `✅ clasico + neon + retro` · `⚠️ parcial`.
