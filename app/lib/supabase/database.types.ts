@@ -3,6 +3,7 @@
 // SPEC 06: tablas `games` (catálogo) y `scores` (leaderboard).
 // SPEC 08: regenerado tras activar `has_leaderboard` en `bloque-buster` (sin cambios de columnas).
 // SPEC 09: regenerado tras activar `has_leaderboard` en `serpentina` (sin cambios de columnas).
+// SPEC 12: tabla `profiles` (perfil de usuario, username único) + función `username_available`.
 export type Json =
   | string
   | number
@@ -63,6 +64,27 @@ export type Database = {
         };
         Relationships: [];
       };
+      profiles: {
+        Row: {
+          created_at: string;
+          id: string;
+          updated_at: string;
+          username: string;
+        };
+        Insert: {
+          created_at?: string;
+          id: string;
+          updated_at?: string;
+          username: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          updated_at?: string;
+          username?: string;
+        };
+        Relationships: [];
+      };
       scores: {
         Row: {
           created_at: string;
@@ -103,7 +125,7 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
-      [_ in never]: never;
+      username_available: { Args: { name: string }; Returns: boolean };
     };
     Enums: {
       [_ in never]: never;

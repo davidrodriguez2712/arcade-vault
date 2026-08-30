@@ -295,23 +295,25 @@ a {
 .av-nav .spacer {
   flex: 1;
 }
-.av-nav .coin-counter {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-family: var(--pixel);
-  font-size: 9px;
-  color: var(--yellow);
-}
-.av-nav .coin-counter .coin {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #fff8b0, #f5ff00 60%, #b0b800);
-  box-shadow: 0 0 8px var(--yellow);
-}
 .av-nav .auth-btn {
   margin-left: 16px;
+}
+.av-nav .nav-session {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: 16px;
+}
+.av-nav .nav-session .auth-btn {
+  margin-left: 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.av-nav .nav-logout {
+  padding: 10px 14px;
+  font-size: 9px;
 }
 .av-nav .hamburger {
   display: none;
@@ -328,7 +330,7 @@ a {
   .av-nav .links {
     display: none;
   }
-  .av-nav .coin-counter {
+  .av-nav .nav-session {
     display: none;
   }
   .av-nav .hamburger {
@@ -373,6 +375,18 @@ a {
 }
 .av-mobile-panel a.active {
   color: var(--cyan);
+}
+.av-mobile-logout {
+  margin-top: 8px;
+  padding: 12px;
+  font-family: var(--pixel);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-align: left;
+  background: transparent;
+  border: 1px solid var(--line);
+  color: var(--magenta);
+  cursor: pointer;
 }
 .av-mobile-backdrop {
   position: fixed;
@@ -1457,6 +1471,41 @@ a {
 .social .btn {
   padding: 12px;
   font-size: 9px;
+}
+
+/* mensajes de estado del auth-card y del perfil (SPEC 12) */
+.auth-msg,
+.auth-ok {
+  margin: 10px 0 0;
+  font-family: var(--mono);
+  font-size: 12px;
+  line-height: 1.5;
+}
+.auth-msg {
+  color: var(--magenta);
+}
+.auth-ok {
+  color: var(--green);
+}
+.auth-notice {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  text-align: center;
+  padding: 6px 0 4px;
+}
+.auth-notice .mono {
+  font-size: 13px;
+  line-height: 1.7;
+  color: var(--ink-dim);
+  margin: 0;
+}
+.auth-notice strong {
+  color: var(--cyan);
+}
+.auth-card .field input:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 /* ===== salón ===== */
