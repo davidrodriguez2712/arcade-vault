@@ -162,12 +162,10 @@ export class Asteroid {
     this.y = wrap(this.y + this.vy * dt, H);
     this.rot += this.rotSpeed * dt;
   }
-  split(): Asteroid[] {
-    if (this.size <= 1) return [];
-    return [
-      new Asteroid(this.x, this.y, this.size - 1),
-      new Asteroid(this.x, this.y, this.size - 1),
-    ];
+  split(out: Asteroid[]): void {
+    if (this.size <= 1) return;
+    out.push(new Asteroid(this.x, this.y, this.size - 1));
+    out.push(new Asteroid(this.x, this.y, this.size - 1));
   }
   draw(ctx: CanvasRenderingContext2D, pal: AsteroidsPalette): void {
     ctx.save();
@@ -290,20 +288,21 @@ export class Ship {
     this.x = wrap(this.x + this.vx * dt, W);
     this.y = wrap(this.y + this.vy * dt, H);
   }
-  tryShoot(): Bullet[] {
-    if (this.shootCooldown > 0 || this.dead) return [];
+  // Empuja los proyectiles nuevos en `out` (el array de balas del motor) en vez
+  // de devolver un array temporal + spread en la ruta de update.
+  tryShoot(out: Bullet[]): void {
+    if (this.shootCooldown > 0 || this.dead) return;
     this.shootCooldown = 0.2;
     const NOSE = 21;
     const ox = this.x + Math.cos(this.angle) * NOSE;
     const oy = this.y + Math.sin(this.angle) * NOSE;
     if (this.tripleShot > 0) {
-      return [
-        new Bullet(ox, oy, this.angle - TRIPLE_SPREAD),
-        new Bullet(ox, oy, this.angle),
-        new Bullet(ox, oy, this.angle + TRIPLE_SPREAD),
-      ];
+      out.push(new Bullet(ox, oy, this.angle - TRIPLE_SPREAD));
+      out.push(new Bullet(ox, oy, this.angle));
+      out.push(new Bullet(ox, oy, this.angle + TRIPLE_SPREAD));
+      return;
     }
-    return [new Bullet(ox, oy, this.angle)];
+    out.push(new Bullet(ox, oy, this.angle));
   }
   draw(ctx: CanvasRenderingContext2D, pal: AsteroidsPalette): void {
     if (this.dead) return;
@@ -363,9 +362,16 @@ export class Particle {
     this.ttl -= dt;
     if (this.ttl <= 0) this.dead = true;
   }
-  draw(ctx: CanvasRenderingContext2D, pal: AsteroidsPalette): void {
+  // `colors` es la tabla precomputada de 101 strings `rgba(r,g,b,0.00..1.00)`
+  // de la skin activa (ver AsteroidsGame.rebuildParticleColors). El índice
+  // `Math.round(alpha*100)` reproduce el `alpha.toFixed(2)` original sin crear
+  // un string por partícula y por frame.
+  draw(ctx: CanvasRenderingContext2D, colors: string[]): void {
     const alpha = this.ttl / this.life;
-    ctx.strokeStyle = `rgba(${pal.particle},${alpha.toFixed(2)})`;
+    let idx = Math.round(alpha * 100);
+    if (idx < 0) idx = 0;
+    else if (idx > 100) idx = 100;
+    ctx.strokeStyle = colors[idx];
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(this.x, this.y);
@@ -414,11 +420,47 @@ export class AsteroidsGame {
     thrust: false,
     fire: false,
   };
+  // ── Scratch reutilizado (cero allocations en la ruta caliente) ──────────────
+  // Objeto de input de la nave: se rellena in situ cada frame en vez de crear
+  // un literal nuevo.
+  private readonly shipInput: ShipInput = {
+    left: false,
+    right: false,
+    thrust: false,
+  };
+  // Buffer para los asteroides recién partidos de un frame; se vacía con
+  // `.length = 0` y se reusa (antes era `const newAsteroids = []` por frame).
+  private readonly splitBuffer: Asteroid[] = [];
+  // Tabla de 101 colores de partícula (`rgba(...,0.00)` … `rgba(...,1.00)`) de
+  // la skin activa. Se reconstruye solo al cambiar skin.
+  private readonly particleColors: string[] = [];
   constructor(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("No se pudo obtener el contexto 2D del canvas.");
     this.canvas = canvas;
     this.ctx = ctx;
+    this.rebuildParticleColors();
+  }
+  // Compacta un array borrando in situ los elementos con `dead === true`,
+  // conservando el orden. Sustituye a `arr.filter((x) => !x.dead)` (que crea un
+  // array nuevo por llamada y por frame).
+  private static compact<T extends { dead: boolean }>(arr: T[]): void {
+    let w = 0;
+    for (let r = 0; r < arr.length; r++) {
+      const item = arr[r];
+      if (!item.dead) arr[w++] = item;
+    }
+    arr.length = w;
+  }
+  // Precalcula los strings rgba de partícula para la skin activa. Los draw()
+  // solo indexan por `Math.round(alpha * 100)`.
+  private rebuildParticleColors(): void {
+    const rgb = ASTEROIDS_SKINS[this.skin].particle;
+    const arr = this.particleColors;
+    for (let i = 0; i <= 100; i++) {
+      arr[i] = `rgba(${rgb},${(i / 100).toFixed(2)})`;
+    }
+    arr.length = 101;
   }
   // Inicializa el estado, engancha el teclado y arranca el game loop.
   // Idempotente: si ya está corriendo, no hace nada.
@@ -456,6 +498,7 @@ export class AsteroidsGame {
   // Cambia la paleta de render al vuelo. No reinicia ni pausa la partida.
   setSkin(name: SkinName): void {
     this.skin = name;
+    this.rebuildParticleColors();
   }
   // Pausa lógica: el loop sigue pintando, pero no actualiza.
   setPaused(paused: boolean): void {
@@ -571,15 +614,18 @@ export class AsteroidsGame {
   private update(dt: number): void {
     if (this.state === "gameover") {
       if (this.pressed("Space")) this.initGame();
-      this.particles.forEach((p) => p.update(dt));
-      this.particles = this.particles.filter((p) => !p.dead);
+      for (let i = 0; i < this.particles.length; i++)
+        this.particles[i].update(dt);
+      AsteroidsGame.compact(this.particles);
       return;
     }
     if (this.state === "dead") {
       this.deadTimer -= dt;
-      this.particles.forEach((p) => p.update(dt));
-      this.particles = this.particles.filter((p) => !p.dead);
-      this.asteroids.forEach((a) => a.update(dt));
+      for (let i = 0; i < this.particles.length; i++)
+        this.particles[i].update(dt);
+      AsteroidsGame.compact(this.particles);
+      for (let i = 0; i < this.asteroids.length; i++)
+        this.asteroids[i].update(dt);
       if (this.deadTimer <= 0) {
         this.state = "playing";
         this.ship.reset();
@@ -588,37 +634,42 @@ export class AsteroidsGame {
     }
     // Disparar
     if (this.pressed("Space")) {
-      this.bullets.push(...this.ship.tryShoot());
+      this.ship.tryShoot(this.bullets);
     }
-    const input: ShipInput = {
-      left: !!this.keys["ArrowLeft"] || this.touch.left,
-      right: !!this.keys["ArrowRight"] || this.touch.right,
-      thrust: !!this.keys["ArrowUp"] || this.touch.thrust,
-    };
+    const input = this.shipInput;
+    input.left = !!this.keys["ArrowLeft"] || this.touch.left;
+    input.right = !!this.keys["ArrowRight"] || this.touch.right;
+    input.thrust = !!this.keys["ArrowUp"] || this.touch.thrust;
     this.ship.update(dt, input);
-    this.bullets.forEach((b) => b.update(dt));
-    this.asteroids.forEach((a) => a.update(dt));
-    this.particles.forEach((p) => p.update(dt));
-    this.powerUps.forEach((p) => p.update(dt));
-    this.bullets = this.bullets.filter((b) => !b.dead);
-    this.particles = this.particles.filter((p) => !p.dead);
-    this.powerUps = this.powerUps.filter((p) => !p.dead);
-    for (const p of this.powerUps) {
+    for (let i = 0; i < this.bullets.length; i++) this.bullets[i].update(dt);
+    for (let i = 0; i < this.asteroids.length; i++)
+      this.asteroids[i].update(dt);
+    for (let i = 0; i < this.particles.length; i++)
+      this.particles[i].update(dt);
+    for (let i = 0; i < this.powerUps.length; i++) this.powerUps[i].update(dt);
+    AsteroidsGame.compact(this.bullets);
+    AsteroidsGame.compact(this.particles);
+    AsteroidsGame.compact(this.powerUps);
+    for (let i = 0; i < this.powerUps.length; i++) {
+      const p = this.powerUps[i];
       if (!p.dead && dist(this.ship, p) < this.ship.radius + p.radius) {
         p.dead = true;
         this.ship.tripleShot = POWERUP_DURATION;
       }
     }
     // Bala vs asteroide
-    const newAsteroids: Asteroid[] = [];
-    for (const b of this.bullets) {
-      for (const a of this.asteroids) {
+    const newAsteroids = this.splitBuffer;
+    newAsteroids.length = 0;
+    for (let bi = 0; bi < this.bullets.length; bi++) {
+      const b = this.bullets[bi];
+      for (let ai = 0; ai < this.asteroids.length; ai++) {
+        const a = this.asteroids[ai];
         if (!a.dead && !b.dead && dist(b, a) < a.radius) {
           b.dead = true;
           a.dead = true;
           this.score += POINTS[a.size];
           this.explode(a.x, a.y, a.size * 5);
-          newAsteroids.push(...a.split());
+          a.split(newAsteroids);
           if (!this.powerUpSpawned) {
             this.killsSinceSpawn++;
             const guaranteed = this.killsSinceSpawn >= 5;
@@ -630,11 +681,16 @@ export class AsteroidsGame {
         }
       }
     }
-    this.asteroids = this.asteroids.filter((a) => !a.dead).concat(newAsteroids);
-    this.bullets = this.bullets.filter((b) => !b.dead);
+    AsteroidsGame.compact(this.asteroids);
+    for (let i = 0; i < newAsteroids.length; i++) {
+      this.asteroids.push(newAsteroids[i]);
+    }
+    newAsteroids.length = 0;
+    AsteroidsGame.compact(this.bullets);
     // Nave vs asteroide
     if (this.ship.invincible <= 0) {
-      for (const a of this.asteroids) {
+      for (let i = 0; i < this.asteroids.length; i++) {
+        const a = this.asteroids[i];
         if (dist(this.ship, a) < this.ship.radius + a.radius * 0.82) {
           this.killShip();
           break;
@@ -707,10 +763,15 @@ export class AsteroidsGame {
     const pal = ASTEROIDS_SKINS[this.skin];
     ctx.fillStyle = pal.bg;
     ctx.fillRect(0, 0, W, H);
-    this.particles.forEach((p) => p.draw(ctx, pal));
-    this.asteroids.forEach((a) => a.draw(ctx, pal));
-    this.powerUps.forEach((p) => p.draw(ctx, pal));
-    this.bullets.forEach((b) => b.draw(ctx, pal));
+    const colors = this.particleColors;
+    for (let i = 0; i < this.particles.length; i++)
+      this.particles[i].draw(ctx, colors);
+    for (let i = 0; i < this.asteroids.length; i++)
+      this.asteroids[i].draw(ctx, pal);
+    for (let i = 0; i < this.powerUps.length; i++)
+      this.powerUps[i].draw(ctx, pal);
+    for (let i = 0; i < this.bullets.length; i++)
+      this.bullets[i].draw(ctx, pal);
     this.ship.draw(ctx, pal);
     this.drawHUD();
     // El texto de GAME OVER lo pinta ahora el overlay React del envoltorio;
