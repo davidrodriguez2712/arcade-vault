@@ -4,6 +4,8 @@ import Link from "next/link";
 import { submitScore } from "@/app/lib/scores-actions";
 import { AsteroidsGame, type GameOverResult, type TouchAction } from "./engine";
 import AsteroidsTouchControls from "./touch-controls";
+import SkinPicker from "../skin-picker";
+import { loadSkin, saveSkin, type SkinName } from "../skins";
 interface AsteroidsPlayerProps {
   title: string;
 }
@@ -24,6 +26,7 @@ export default function AsteroidsPlayer({ title }: AsteroidsPlayerProps) {
   const [name, setName] = useState("");
   const [phase, setPhase] = useState<SavePhase>("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [skin, setSkin] = useState<SkinName>("clasico");
   useEffect(() => {
     const canvas = canvasRef.current;
     const stage = stageRef.current;
@@ -43,6 +46,9 @@ export default function AsteroidsPlayer({ title }: AsteroidsPlayerProps) {
       game.resize(rect.width, rect.height, window.devicePixelRatio || 1);
     };
     applySize();
+    const savedSkin = loadSkin(GAME_ID);
+    game.setSkin(savedSkin);
+    setSkin(savedSkin);
     game.start();
     const ro = new ResizeObserver(applySize);
     ro.observe(stage);
@@ -72,6 +78,11 @@ export default function AsteroidsPlayer({ title }: AsteroidsPlayerProps) {
   }, []);
   const handleInput = (action: TouchAction, pressed: boolean) => {
     gameRef.current?.setInput(action, pressed);
+  };
+  const handleSkin = (next: SkinName) => {
+    gameRef.current?.setSkin(next);
+    saveSkin(GAME_ID, next);
+    setSkin(next);
   };
   const handleRestart = () => {
     gameRef.current?.restart();
@@ -114,6 +125,7 @@ export default function AsteroidsPlayer({ title }: AsteroidsPlayerProps) {
           <span>ASTEROIDES</span>
         </div>
       </div>
+      <SkinPicker gameId={GAME_ID} value={skin} onChange={handleSkin} />
       <div style={{ marginTop: 16 }}>
         <Link className="btn ghost" href="/juego/rocas">
           VOLVER

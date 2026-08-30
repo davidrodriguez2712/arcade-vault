@@ -4,6 +4,7 @@
 // con start() y se apaga con stop() / destroy(). El motor dibuja siempre en un
 // espacio interno fijo de 800x600 (igual que `rocas` y `bloque-buster`). El
 // escalado responsive vive solo en resize().
+import type { SkinName } from "../skins";
 const W = 800;
 const H = 600;
 const CELL = 25;
@@ -16,10 +17,73 @@ const FRUITS_PER_TIER = 4;
 // Tramos de velocidad en celdas/s; interval = 1 / cps. Sube uno cada 4 frutas.
 const TIER_CELLS_PER_S = [7, 9, 11, 13, 15, 18];
 const PIXEL_FONT = '"Press Start 2P", monospace';
-const SNAKE_BODY = "#00ff88";
-const SNAKE_HEAD = "#b9ffdb";
-const GRID_LINE = "rgba(0, 255, 136, 0.08)";
-const HUD_RULE = "rgba(0, 255, 136, 0.32)";
+// ── Skins ────────────────────────────────────────────────────────────────────
+// Un rol de color por uso real del canvas. Ningún literal de color queda suelto
+// en los draw(): todo sale de SNAKE_SKINS[this.skin].<rol>. La fruta usa el
+// spritesheet PNG (public/games/serpentina/fruits.png), que la paleta no toca;
+// `fruit` solo colorea el rombo procedural de respaldo mientras el sprite carga.
+export interface SnakePalette {
+  bg: string; // fondo del campo de juego
+  grid: string; // líneas de la rejilla
+  hudRule: string; // regla separadora bajo la banda de HUD
+  snakeHead: string; // segmento de cabeza
+  snakeBody: string; // resto del cuerpo
+  fruit: string; // rombo de respaldo de la fruta (pre-sprite)
+  hudScore: string; // texto SCORE
+  hudLabel: string; // texto LONGITUD
+  hudAccent: string; // texto VEL. xN
+  overlayTitle: string; // título "EN PAUSA"
+  overlayDim: string; // subtítulo del overlay de pausa
+  glow: number; // shadowBlur de serpiente y fruta (0 = sin brillo)
+}
+export const SNAKE_SKINS: Record<SkinName, SnakePalette> = {
+  // Copia literal de los colores originales del juego.
+  clasico: {
+    bg: "#000",
+    grid: "rgba(0, 255, 136, 0.08)",
+    hudRule: "rgba(0, 255, 136, 0.32)",
+    snakeHead: "#b9ffdb",
+    snakeBody: "#00ff88",
+    fruit: "#ff2fa8",
+    hudScore: "#e6e9ff",
+    hudLabel: "#8a8fb5",
+    hudAccent: "#00ff88",
+    overlayTitle: "#fff",
+    overlayDim: "rgba(255,255,255,0.65)",
+    glow: 0,
+  },
+  // Paleta casa de Arcade Vault: cian/magenta/amarillo/verde saturados sobre
+  // negro con brillo CRT marcado.
+  neon: {
+    bg: "#04030a",
+    grid: "rgba(0, 245, 255, 0.1)",
+    hudRule: "rgba(0, 245, 255, 0.4)",
+    snakeHead: "#f5ff00",
+    snakeBody: "#00ff88",
+    fruit: "#ff006e",
+    hudScore: "#00f5ff",
+    hudLabel: "rgba(0, 245, 255, 0.6)",
+    hudAccent: "#ff006e",
+    overlayTitle: "#ff006e",
+    overlayDim: "rgba(0, 245, 255, 0.6)",
+    glow: 12,
+  },
+  // Monitor de fósforo ámbar: monocromo cálido, sin glow, aire de terminal 80s.
+  retro: {
+    bg: "#0a0600",
+    grid: "rgba(255, 176, 0, 0.1)",
+    hudRule: "rgba(255, 176, 0, 0.35)",
+    snakeHead: "#ffe4b0",
+    snakeBody: "#ffb000",
+    fruit: "#d98e2a",
+    hudScore: "#ffb000",
+    hudLabel: "rgba(255, 176, 0, 0.55)",
+    hudAccent: "#ffd98a",
+    overlayTitle: "#ffb000",
+    overlayDim: "rgba(255, 176, 0, 0.55)",
+    glow: 0,
+  },
+};
 // Spritesheet de frutas: fila pixel-art de public/games/serpentina/fruits.png.
 // Coordenadas copiadas de references/source-assets/snake-assets/sprites.js
 // (fila y=136, alto 160). Se rota por estas 22 solo por estética.
@@ -88,6 +152,7 @@ export class SnakeGame {
   private fruitsEaten = 0;
   private tier = 1; // 1..6
   private state: GameState = "playing";
+  private skin: SkinName = "clasico";
   private tickAccum = 0; // segundos acumulados hacia el siguiente paso
   // Aviso de fin de partida al envoltorio React (una sola vez por partida).
   private onGameOver: ((result: GameOverResult) => void) | null = null;
@@ -140,6 +205,10 @@ export class SnakeGame {
   // pared o con el propio cuerpo.
   setOnGameOver(cb: (result: GameOverResult) => void): void {
     this.onGameOver = cb;
+  }
+  // Cambia la skin al vuelo: no reinicia la partida ni toca la puntuación.
+  setSkin(name: SkinName): void {
+    this.skin = name;
   }
   // Pausa lógica: el loop sigue pintando, pero no actualiza.
   setPaused(paused: boolean): void {
@@ -295,7 +364,8 @@ export class SnakeGame {
   }
   private drawGrid(): void {
     const { ctx } = this;
-    ctx.strokeStyle = GRID_LINE;
+    const pal = SNAKE_SKINS[this.skin];
+    ctx.strokeStyle = pal.grid;
     ctx.lineWidth = 1;
     ctx.beginPath();
     for (let c = 0; c <= COLS; c++) {
@@ -308,7 +378,7 @@ export class SnakeGame {
     }
     ctx.stroke();
     // Regla separadora del HUD.
-    ctx.strokeStyle = HUD_RULE;
+    ctx.strokeStyle = pal.hudRule;
     ctx.beginPath();
     ctx.moveTo(0, HUD_H);
     ctx.lineTo(W, HUD_H);
@@ -316,6 +386,7 @@ export class SnakeGame {
   }
   private drawFruit(): void {
     const { ctx } = this;
+    const pal = SNAKE_SKINS[this.skin];
     const cx = this.fruit.col * CELL + CELL / 2;
     const cy = HUD_H + this.fruit.row * CELL + CELL / 2;
     if (this.spritesReady && this.sprites) {
@@ -339,7 +410,10 @@ export class SnakeGame {
     }
     // Respaldo procedural mientras el sprite no ha cargado.
     const rad = CELL * 0.42;
-    ctx.fillStyle = "#ff2fa8";
+    ctx.save();
+    ctx.shadowBlur = pal.glow;
+    ctx.shadowColor = pal.fruit;
+    ctx.fillStyle = pal.fruit;
     ctx.beginPath();
     ctx.moveTo(cx, cy - rad);
     ctx.lineTo(cx + rad, cy);
@@ -347,35 +421,44 @@ export class SnakeGame {
     ctx.lineTo(cx - rad, cy);
     ctx.closePath();
     ctx.fill();
+    ctx.restore();
   }
   private drawSnake(): void {
     const { ctx } = this;
+    const pal = SNAKE_SKINS[this.skin];
+    ctx.save();
+    ctx.shadowBlur = pal.glow;
     this.snake.forEach((seg, i) => {
       const x = seg.col * CELL + 2;
       const y = HUD_H + seg.row * CELL + 2;
       const s = CELL - 4;
-      ctx.fillStyle = i === 0 ? SNAKE_HEAD : SNAKE_BODY;
+      const color = i === 0 ? pal.snakeHead : pal.snakeBody;
+      ctx.fillStyle = color;
+      ctx.shadowColor = color;
       this.roundRectPath(x, y, s, s, 6);
       ctx.fill();
     });
+    ctx.restore();
   }
   private drawHud(): void {
     const { ctx } = this;
+    const pal = SNAKE_SKINS[this.skin];
     ctx.font = `13px ${PIXEL_FONT}`;
     ctx.textBaseline = "middle";
     ctx.textAlign = "left";
-    ctx.fillStyle = "#e6e9ff";
+    ctx.fillStyle = pal.hudScore;
     ctx.fillText(`SCORE ${this.score.toLocaleString("es-ES")}`, 12, HUD_H / 2);
     ctx.textAlign = "center";
-    ctx.fillStyle = "#8a8fb5";
+    ctx.fillStyle = pal.hudLabel;
     ctx.fillText(`LONGITUD ${this.snake.length}`, W / 2, HUD_H / 2);
     ctx.textAlign = "right";
-    ctx.fillStyle = SNAKE_BODY;
+    ctx.fillStyle = pal.hudAccent;
     ctx.fillText(`VEL. x${this.tier}`, W - 12, HUD_H / 2);
   }
   private draw(): void {
     const { ctx } = this;
-    ctx.fillStyle = "#000";
+    const pal = SNAKE_SKINS[this.skin];
+    ctx.fillStyle = pal.bg;
     ctx.fillRect(0, 0, W, H);
     this.drawGrid();
     this.drawFruit();
@@ -384,11 +467,11 @@ export class SnakeGame {
     if (this.paused && this.state !== "gameover") {
       ctx.textAlign = "center";
       ctx.textBaseline = "alphabetic";
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = pal.overlayTitle;
       ctx.font = `bold 30px ${PIXEL_FONT}`;
       ctx.fillText("EN PAUSA", W / 2, H / 2 - 12);
       ctx.font = `12px ${PIXEL_FONT}`;
-      ctx.fillStyle = "rgba(255,255,255,0.65)";
+      ctx.fillStyle = pal.overlayDim;
       ctx.fillText("ESC / P PARA CONTINUAR", W / 2, H / 2 + 16);
     }
     // El texto de GAME OVER lo pinta el overlay React del envoltorio.
