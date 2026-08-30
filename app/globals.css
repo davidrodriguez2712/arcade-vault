@@ -2874,6 +2874,19 @@ a {
   object-fit: contain;
   touch-action: none;
 }
+/* ===== juego: frogger (ranaria) ===== */
+.frogger-stage {
+  position: absolute;
+  inset: 0;
+  background: #000;
+}
+.frogger-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  touch-action: none;
+}
 /* ===== leaderboard: estado vacío (SPEC 06) ===== */
 .lb-empty {
   display: flex;
