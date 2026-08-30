@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { submitScore } from "@/app/lib/scores-actions";
 import { AsteroidsGame, type GameOverResult, type TouchAction } from "./engine";
-import AsteroidsTouchControls from "./touch-controls";
+import MobileGamepad, { type PadControl } from "../mobile-gamepad";
 import SkinPicker from "../skin-picker";
 import { loadSkin, saveSkin, type SkinName } from "../skins";
 interface AsteroidsPlayerProps {
@@ -18,6 +18,13 @@ const SCROLL_KEYS = [
   "Space",
 ];
 type SavePhase = "idle" | "saving" | "saved" | "error";
+const PAD_MAP: Partial<Record<PadControl, TouchAction>> = {
+  left: "left",
+  right: "right",
+  up: "thrust",
+  a: "fire",
+  b: "thrust",
+};
 export default function AsteroidsPlayer({ title }: AsteroidsPlayerProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -106,7 +113,18 @@ export default function AsteroidsPlayer({ title }: AsteroidsPlayerProps) {
     }
   };
   return (
-    <div className="av-player fade-in">
+    <div className="av-player av-player--game fade-in">
+      <div className="game-topbar">
+        <Link className="btn ghost" href="/juego/rocas">
+          VOLVER
+        </Link>
+        <SkinPicker
+          gameId={GAME_ID}
+          value={skin}
+          onChange={handleSkin}
+          compact
+        />
+      </div>
       <div className="crt">
         <div className="crt-screen">
           <div className="asteroids-stage" ref={stageRef}>
@@ -117,7 +135,6 @@ export default function AsteroidsPlayer({ title }: AsteroidsPlayerProps) {
               height={600}
             />
           </div>
-          <AsteroidsTouchControls onInput={handleInput} />
         </div>
         <div className="crt-bottom">
           <span className="led">SEÑAL OK</span>
@@ -125,8 +142,9 @@ export default function AsteroidsPlayer({ title }: AsteroidsPlayerProps) {
           <span>ASTEROIDES</span>
         </div>
       </div>
+      <MobileGamepad map={PAD_MAP} onInput={handleInput} label="ASTEROIDES" />
       <SkinPicker gameId={GAME_ID} value={skin} onChange={handleSkin} />
-      <div style={{ marginTop: 16 }}>
+      <div className="desktop-only-back" style={{ marginTop: 16 }}>
         <Link className="btn ghost" href="/juego/rocas">
           VOLVER
         </Link>

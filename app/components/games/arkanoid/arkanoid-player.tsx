@@ -3,13 +3,17 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { submitScore } from "@/app/lib/scores-actions";
 import { ArkanoidGame, type GameOverResult, type TouchAction } from "./engine";
-import ArkanoidTouchControls from "./touch-controls";
+import MobileGamepad, { type PadControl } from "../mobile-gamepad";
 import SkinPicker from "../skin-picker";
 import { loadSkin, saveSkin, type SkinName } from "../skins";
 interface ArkanoidPlayerProps {
   title: string;
 }
 const GAME_ID = "bloque-buster";
+const PAD_MAP: Partial<Record<PadControl, TouchAction>> = {
+  left: "left",
+  right: "right",
+};
 const SCROLL_KEYS = [
   "ArrowUp",
   "ArrowDown",
@@ -110,7 +114,18 @@ export default function ArkanoidPlayer({ title }: ArkanoidPlayerProps) {
     }
   };
   return (
-    <div className="av-player fade-in">
+    <div className="av-player av-player--game fade-in">
+      <div className="game-topbar">
+        <Link className="btn ghost" href="/juego/bloque-buster">
+          VOLVER
+        </Link>
+        <SkinPicker
+          gameId={GAME_ID}
+          value={skin}
+          onChange={handleSkin}
+          compact
+        />
+      </div>
       <div className="crt">
         <div className="crt-screen">
           <div className="arkanoid-stage" ref={stageRef}>
@@ -121,7 +136,6 @@ export default function ArkanoidPlayer({ title }: ArkanoidPlayerProps) {
               height={600}
             />
           </div>
-          <ArkanoidTouchControls onInput={handleInput} />
         </div>
         <div className="crt-bottom">
           <span className="led">SEÑAL OK</span>
@@ -129,8 +143,9 @@ export default function ArkanoidPlayer({ title }: ArkanoidPlayerProps) {
           <span>ARKANOID</span>
         </div>
       </div>
+      <MobileGamepad map={PAD_MAP} onInput={handleInput} label="ARKANOID" />
       <SkinPicker gameId={GAME_ID} value={skin} onChange={handleSkin} />
-      <div style={{ marginTop: 16 }}>
+      <div className="desktop-only-back" style={{ marginTop: 16 }}>
         <Link className="btn ghost" href="/juego/bloque-buster">
           VOLVER
         </Link>

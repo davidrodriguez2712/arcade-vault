@@ -3,13 +3,19 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { submitScore } from "@/app/lib/scores-actions";
 import { SnakeGame, type GameOverResult, type TouchAction } from "./engine";
-import SnakeTouchControls from "./touch-controls";
+import MobileGamepad, { type PadControl } from "../mobile-gamepad";
 import SkinPicker from "../skin-picker";
 import { loadSkin, saveSkin, type SkinName } from "../skins";
 interface SnakePlayerProps {
   title: string;
 }
 const GAME_ID = "serpentina";
+const PAD_MAP: Partial<Record<PadControl, TouchAction>> = {
+  up: "up",
+  down: "down",
+  left: "left",
+  right: "right",
+};
 const SCROLL_KEYS = [
   "ArrowUp",
   "ArrowDown",
@@ -112,7 +118,18 @@ export default function SnakePlayer({ title }: SnakePlayerProps) {
     }
   };
   return (
-    <div className="av-player fade-in">
+    <div className="av-player av-player--game fade-in">
+      <div className="game-topbar">
+        <Link className="btn ghost" href="/juego/serpentina">
+          VOLVER
+        </Link>
+        <SkinPicker
+          gameId={GAME_ID}
+          value={skin}
+          onChange={handleSkin}
+          compact
+        />
+      </div>
       <div className="crt">
         <div className="crt-screen">
           <div className="snake-stage" ref={stageRef}>
@@ -123,7 +140,6 @@ export default function SnakePlayer({ title }: SnakePlayerProps) {
               height={600}
             />
           </div>
-          <SnakeTouchControls onInput={handleInput} />
         </div>
         <div className="crt-bottom">
           <span className="led">SEÑAL OK</span>
@@ -131,8 +147,14 @@ export default function SnakePlayer({ title }: SnakePlayerProps) {
           <span>SNAKE</span>
         </div>
       </div>
+      <MobileGamepad
+        map={PAD_MAP}
+        onInput={handleInput}
+        accent="green"
+        label="SNAKE"
+      />
       <SkinPicker gameId={GAME_ID} value={skin} onChange={handleSkin} />
-      <div style={{ marginTop: 16 }}>
+      <div className="desktop-only-back" style={{ marginTop: 16 }}>
         <Link className="btn ghost" href="/juego/serpentina">
           VOLVER
         </Link>

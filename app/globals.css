@@ -54,6 +54,10 @@ body,
 #root {
   height: 100%;
   margin: 0;
+  /* Corta cualquier desborde lateral sin crear un contenedor de scroll
+     (a diferencia de overflow: hidden), así el .av-nav sticky sigue intacto.
+     Ver memoria nav-overflow-390px. */
+  overflow-x: clip;
 }
 
 body {
@@ -63,7 +67,6 @@ body {
   font-size: 14px;
   line-height: 1.5;
   letter-spacing: 0.01em;
-  overflow-x: hidden;
   -webkit-font-smoothing: antialiased;
 }
 
@@ -312,6 +315,10 @@ a {
 }
 .av-nav .hamburger {
   display: none;
+  flex: none;
+  width: 40px;
+  padding: 0;
+  letter-spacing: 0;
 }
 
 @media (max-width: 840px) {
@@ -338,13 +345,24 @@ a {
   z-index: 60;
   padding: 24px 20px;
   transform: translateX(100%);
-  transition: transform 220ms ease;
+  /* visibility se retrasa hasta que acabe el deslizamiento al cerrar. */
+  transition:
+    transform 220ms ease,
+    visibility 0s linear 220ms;
   display: flex;
   flex-direction: column;
   gap: 8px;
 }
+.av-mobile-panel:not(.open) {
+  /* Panel cerrado fuera de pantalla: no debe sumar ancho a scrollWidth. */
+  visibility: hidden;
+}
 .av-mobile-panel.open {
   transform: translateX(0);
+  visibility: visible;
+  transition:
+    transform 220ms ease,
+    visibility 0s;
 }
 .av-mobile-panel a {
   padding: 14px 12px;
@@ -363,11 +381,20 @@ a {
   z-index: 55;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 180ms;
+  transition:
+    opacity 180ms,
+    visibility 0s linear 180ms;
+}
+.av-mobile-backdrop:not(.open) {
+  visibility: hidden;
 }
 .av-mobile-backdrop.open {
   opacity: 1;
   pointer-events: auto;
+  visibility: visible;
+  transition:
+    opacity 180ms,
+    visibility 0s;
 }
 
 /* ===== generic neon button ===== */
@@ -2808,56 +2835,6 @@ a {
   object-fit: contain;
   touch-action: none;
 }
-.asteroids-touch {
-  position: absolute;
-  inset: 0;
-  display: none;
-  pointer-events: none;
-  z-index: 4;
-}
-@media (pointer: coarse) {
-  .asteroids-touch {
-    display: block;
-  }
-}
-.asteroids-touch-btn {
-  position: absolute;
-  bottom: 18px;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  border: 1px solid var(--cyan);
-  background: rgba(0, 0, 0, 0.4);
-  color: var(--cyan);
-  font-family: var(--pixel);
-  font-size: 16px;
-  line-height: 1;
-  display: grid;
-  place-items: center;
-  pointer-events: auto;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-.asteroids-touch-btn:active {
-  background: rgba(0, 245, 255, 0.28);
-}
-.asteroids-touch-btn.left {
-  left: 16px;
-}
-.asteroids-touch-btn.right {
-  left: 88px;
-}
-.asteroids-touch-btn.thrust {
-  right: 88px;
-}
-.asteroids-touch-btn.fire {
-  right: 16px;
-  border-color: var(--magenta);
-  color: var(--magenta);
-}
-
 /* ===== juego: tetris (caida) ===== */
 .tetris-stage {
   position: absolute;
@@ -2871,61 +2848,6 @@ a {
   object-fit: contain;
   touch-action: none;
 }
-.tetris-touch {
-  position: absolute;
-  inset: 0;
-  display: none;
-  pointer-events: none;
-  z-index: 4;
-}
-@media (pointer: coarse) {
-  .tetris-touch {
-    display: block;
-  }
-}
-.tetris-touch-btn {
-  position: absolute;
-  bottom: 16px;
-  width: 54px;
-  height: 54px;
-  border-radius: 50%;
-  border: 1px solid var(--cyan);
-  background: rgba(0, 0, 0, 0.4);
-  color: var(--cyan);
-  font-family: var(--pixel);
-  font-size: 14px;
-  line-height: 1;
-  display: grid;
-  place-items: center;
-  pointer-events: auto;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-.tetris-touch-btn:active {
-  background: rgba(0, 245, 255, 0.28);
-}
-/* izquierda: mover · derecha: rotar (arriba) + soft/hard drop (abajo) */
-.tetris-touch-btn.left {
-  left: 14px;
-}
-.tetris-touch-btn.right {
-  left: 76px;
-}
-.tetris-touch-btn.rotate {
-  right: 14px;
-  bottom: 78px;
-}
-.tetris-touch-btn.down {
-  right: 76px;
-}
-.tetris-touch-btn.drop {
-  right: 14px;
-  border-color: var(--magenta);
-  color: var(--magenta);
-}
-
 /* ===== juego: arkanoid (bloque-buster) ===== */
 .arkanoid-stage {
   position: absolute;
@@ -2939,48 +2861,6 @@ a {
   object-fit: contain;
   touch-action: none;
 }
-.arkanoid-touch {
-  position: absolute;
-  inset: 0;
-  display: none;
-  pointer-events: none;
-  z-index: 4;
-}
-@media (pointer: coarse) {
-  .arkanoid-touch {
-    display: block;
-  }
-}
-.arkanoid-touch-btn {
-  position: absolute;
-  bottom: 18px;
-  width: 60px;
-  height: 60px;
-  border-radius: 50%;
-  border: 1px solid var(--cyan);
-  background: rgba(0, 0, 0, 0.4);
-  color: var(--cyan);
-  font-family: var(--pixel);
-  font-size: 16px;
-  line-height: 1;
-  display: grid;
-  place-items: center;
-  pointer-events: auto;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-.arkanoid-touch-btn:active {
-  background: rgba(0, 245, 255, 0.28);
-}
-.arkanoid-touch-btn.left {
-  left: 16px;
-}
-.arkanoid-touch-btn.right {
-  left: 88px;
-}
-
 /* ===== juego: snake (serpentina) ===== */
 .snake-stage {
   position: absolute;
@@ -2994,57 +2874,6 @@ a {
   object-fit: contain;
   touch-action: none;
 }
-.snake-touch {
-  position: absolute;
-  inset: 0;
-  display: none;
-  pointer-events: none;
-  z-index: 4;
-}
-@media (pointer: coarse) {
-  .snake-touch {
-    display: block;
-  }
-}
-.snake-touch-btn {
-  position: absolute;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  border: 1px solid var(--green);
-  background: rgba(0, 0, 0, 0.4);
-  color: var(--green);
-  font-family: var(--pixel);
-  font-size: 15px;
-  line-height: 1;
-  display: grid;
-  place-items: center;
-  pointer-events: auto;
-  touch-action: none;
-  user-select: none;
-  -webkit-user-select: none;
-  -webkit-tap-highlight-color: transparent;
-}
-.snake-touch-btn:active {
-  background: rgba(0, 255, 136, 0.28);
-}
-.snake-touch-btn.up {
-  right: 69px;
-  bottom: 142px;
-}
-.snake-touch-btn.down {
-  right: 69px;
-  bottom: 22px;
-}
-.snake-touch-btn.left {
-  right: 129px;
-  bottom: 82px;
-}
-.snake-touch-btn.right {
-  right: 9px;
-  bottom: 82px;
-}
-
 /* ===== leaderboard: estado vacío (SPEC 06) ===== */
 .lb-empty {
   display: flex;
@@ -3098,4 +2927,186 @@ a {
   color: var(--cyan);
   border-color: var(--cyan);
   box-shadow: 0 0 8px rgba(0, 245, 255, 0.35);
+}
+.skin-picker--compact {
+  margin: 0;
+  flex: 0 0 auto;
+  padding: 6px 12px;
+  border: 1px solid var(--cyan);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--cyan);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+/* ===== reproductor móvil (SPEC 10) ===== */
+.game-topbar {
+  display: none;
+}
+.mobile-gamepad {
+  display: none;
+}
+@media (pointer: coarse) {
+  /* Vista de juego a pantalla completa: barra / canvas / mando, sin scroll. */
+  .av-player--game {
+    position: fixed;
+    inset: 0;
+    margin: 0;
+    padding: 0;
+    max-width: none;
+    display: flex;
+    flex-direction: column;
+    background: #000;
+    /* Por encima de .av-nav (sticky, z-index: 50): la vista de juego en móvil
+       es inmersiva y tapa el site-nav (ver Risks de SPEC 10). */
+    z-index: 60;
+  }
+  .game-topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    padding: 6px 10px;
+    min-height: 40px;
+    background: var(--bg-2);
+    border-bottom: 1px solid var(--line);
+  }
+  .game-topbar .btn {
+    padding: 6px 12px;
+    font-size: 10px;
+  }
+  .av-player--game .crt {
+    flex: 1;
+    min-height: 0;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: #000;
+  }
+  .av-player--game .crt::before {
+    display: none;
+  }
+  .av-player--game .crt-screen {
+    aspect-ratio: auto;
+    width: 100%;
+    height: 100%;
+    border-radius: 0;
+  }
+  .av-player--game .crt-bottom {
+    display: none;
+  }
+  /* Controles de escritorio sueltos bajo el marco: los reemplaza la game-topbar. */
+  .av-player--game > .skin-picker,
+  .av-player--game > .desktop-only-back {
+    display: none;
+  }
+  .mobile-gamepad {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px calc(10px + env(safe-area-inset-bottom));
+    background: var(--bg-2);
+    border-top: 1px solid var(--line);
+    flex: 0 0 auto;
+  }
+  .pad-dpad {
+    display: grid;
+    grid-template-areas:
+      ". up ."
+      "left . right"
+      ". down .";
+    gap: 6px;
+  }
+  .pad-actions {
+    display: flex;
+    gap: 14px;
+  }
+  .pad-btn {
+    width: 46px;
+    height: 46px;
+    border-radius: 50%;
+    border: 1px solid var(--cyan);
+    background: rgba(0, 0, 0, 0.4);
+    color: var(--cyan);
+    font-family: var(--pixel);
+    font-size: 14px;
+    display: grid;
+    place-items: center;
+    pointer-events: auto;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .pad-btn[data-control="up"] {
+    grid-area: up;
+  }
+  .pad-btn[data-control="down"] {
+    grid-area: down;
+  }
+  .pad-btn[data-control="left"] {
+    grid-area: left;
+  }
+  .pad-btn[data-control="right"] {
+    grid-area: right;
+  }
+  .pad-btn:active:not(.is-idle) {
+    background: rgba(0, 245, 255, 0.28);
+  }
+  .pad-btn.is-idle {
+    opacity: 0.25;
+    pointer-events: none;
+  }
+  .pad-btn[data-control="a"] {
+    border-color: var(--magenta);
+    color: var(--magenta);
+  }
+  .mobile-gamepad[data-accent="green"] .pad-btn:not([data-control="a"]) {
+    border-color: var(--green);
+    color: var(--green);
+  }
+  .mobile-gamepad[data-accent="green"]
+    .pad-btn:not([data-control="a"]):active:not(.is-idle) {
+    background: rgba(0, 255, 136, 0.28);
+  }
+}
+
+/* Apaisado: canvas a pantalla completa, mando dividido en dos mitades
+   superpuestas (estilo consola portátil), barra como franja translúcida. */
+@media (pointer: coarse) and (orientation: landscape) {
+  .av-player--game .crt {
+    flex: 1;
+  }
+  .game-topbar {
+    position: absolute;
+    inset: 0 0 auto 0;
+    background: rgba(5, 5, 7, 0.6);
+    border-bottom: 0;
+    z-index: 32;
+  }
+  .mobile-gamepad {
+    position: absolute;
+    inset: auto 0 0 0;
+    padding: 0;
+    background: transparent;
+    border-top: 0;
+    pointer-events: none;
+    z-index: 32;
+  }
+  .mobile-gamepad .pad-dpad {
+    position: absolute;
+    left: calc(16px + env(safe-area-inset-left));
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    pointer-events: auto;
+  }
+  .mobile-gamepad .pad-actions {
+    position: absolute;
+    right: calc(16px + env(safe-area-inset-right));
+    bottom: calc(16px + env(safe-area-inset-bottom));
+    pointer-events: auto;
+  }
 }
