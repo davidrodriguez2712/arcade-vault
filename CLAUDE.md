@@ -20,7 +20,7 @@ npx skills@latest add Klerith/fernando-skills
 
 Write a spec before implementing a feature.
 
-Para juegos nuevos el flujo es: agente `game-planner` (decide qué juego, ver `## Agents`) → `/add-game` (redacta e implementa la spec).
+Para juegos nuevos el flujo es: agente `game-planner` (decide un juego) o agente `game-jam` (lote de 3 specs por tema) — ver `## Agents` — → revisión → `/add-game` (redacta e implementa la spec).
 
 ## Commands
 
@@ -56,6 +56,7 @@ No test runner is configured.
 ## Agents
 
 - `game-planner` (`.claude/agents/game-planner.md`) — decide **qué** juego añadir a continuación y si encaja con la plataforma (categoría, estética CRT, motor agnóstico, puntuación para el leaderboard). Mantiene su memoria de sugerencias en `references/game-suggestion-todo.md`. Entrega el handoff a `/add-game`; no escribe specs ni código.
+- `game-jam` (`.claude/agents/game-jam.md`) — dado un **tema**, elige 3 juegos que encajan con la plataforma y redacta por cada uno dos specs completas (`01` motor + `02` vitrina) en `specs/game-jam/<game-id>/`, en `Borrador`, para revisión humana. No implementa ni ejecuta `/add-game`; solo escribe los `.md` bajo `specs/game-jam/`.
 
 ## The managed agent-rules block
 
