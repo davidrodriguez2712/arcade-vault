@@ -4,6 +4,7 @@
 // con start() y se apaga con stop() / destroy(). El motor dibuja siempre en un
 // espacio interno fijo de 800x600 (igual que el referente y que `rocas`). El
 // escalado responsive vive solo en resize().
+import type { SkinName } from "../skins";
 const W = 800;
 const H = 600;
 const PADDLE_SPEED = 400; // px/s
@@ -17,19 +18,104 @@ const BASE_BALL_VY = -300;
 const BURST_DURATION = 150; // ms
 const POINTS_PER_BLOCK = 10;
 const MAX_LEVEL = 5;
-// Colores de bloque del referente re-mapeados a la paleta neon de globals.css
-// (el canvas no lee las CSS vars sin fricción).
-const NEON: Record<string, string> = {
-  red: "#ff3b6b",
-  yellow: "#f5ff00",
-  cyan: "#00f5ff",
-  magenta: "#ff006e",
-  hotpink: "#ff5fbf",
-  green: "#00ff88",
-  gray: "#c7d0e0",
-};
 const PIXEL_FONT = '"Press Start 2P", monospace';
-const GRID_LINE = "rgba(0, 245, 255, 0.14)";
+// ── Skins ────────────────────────────────────────────────────────────────────
+// Ningún literal de color vive en draw(): todo sale de ARKANOID_SKINS[skin].<rol>.
+// Las 6+1 claves de `blocks` son los nombres de color del referente (levels.js);
+// cada nivel asigna a sus celdas una de esas claves y la skin decide el tono.
+type BlockColorKey =
+  "red" | "yellow" | "cyan" | "magenta" | "hotpink" | "green" | "gray";
+export interface ArkanoidPalette {
+  bg: string; // fondo del canvas
+  floorLine: string; // línea de suelo bajo la paleta
+  ball: string; // bola
+  paddle: string; // paleta del jugador
+  paddleHighlight: string; // brillo superior de la paleta
+  blockHighlight: string; // brillo superior de cada bloque
+  hudScore: string; // texto SCORE
+  hudLevel: string; // texto NIVEL
+  hudLives: string; // bolitas de vidas
+  pauseText: string; // "EN PAUSA"
+  pauseSub: string; // subtítulo de pausa
+  glow: number; // shadowBlur en px (0 = sin glow)
+  blocks: Record<BlockColorKey, string>;
+}
+export const ARKANOID_SKINS: Record<SkinName, ArkanoidPalette> = {
+  // Copia literal de los colores previos del juego.
+  clasico: {
+    bg: "#000",
+    floorLine: "rgba(0, 245, 255, 0.14)",
+    ball: "#ffffff",
+    paddle: "#00f5ff",
+    paddleHighlight: "rgba(255, 255, 255, 0.35)",
+    blockHighlight: "rgba(255, 255, 255, 0.16)",
+    hudScore: "#e6e9ff",
+    hudLevel: "#8a8fb5",
+    hudLives: "#00f5ff",
+    pauseText: "#fff",
+    pauseSub: "rgba(255,255,255,0.65)",
+    glow: 0,
+    blocks: {
+      red: "#ff3b6b",
+      yellow: "#f5ff00",
+      cyan: "#00f5ff",
+      magenta: "#ff006e",
+      hotpink: "#ff5fbf",
+      green: "#00ff88",
+      gray: "#c7d0e0",
+    },
+  },
+  // Paleta casa Arcade Vault: cian/magenta/amarillo/verde saturados sobre negro,
+  // glow CRT marcado, bola amarilla luminosa.
+  neon: {
+    bg: "#000",
+    floorLine: "rgba(0, 245, 255, 0.28)",
+    ball: "#f5ff00",
+    paddle: "#00f5ff",
+    paddleHighlight: "rgba(255, 255, 255, 0.55)",
+    blockHighlight: "rgba(255, 255, 255, 0.22)",
+    hudScore: "#00f5ff",
+    hudLevel: "#ff006e",
+    hudLives: "#00ff88",
+    pauseText: "#f5ff00",
+    pauseSub: "rgba(0,245,255,0.8)",
+    glow: 14,
+    blocks: {
+      red: "#ff006e",
+      yellow: "#f5ff00",
+      cyan: "#00f5ff",
+      magenta: "#ff006e",
+      hotpink: "#ff5fbf",
+      green: "#00ff88",
+      gray: "#00f5ff",
+    },
+  },
+  // Monitor de fósforo ámbar: monocromo cálido sobre negro, sin glow, los
+  // bloques se separan por variaciones de brillo del mismo tono.
+  retro: {
+    bg: "#0a0600",
+    floorLine: "rgba(255, 176, 0, 0.18)",
+    ball: "#ffe4a3",
+    paddle: "#ffb000",
+    paddleHighlight: "rgba(255, 224, 160, 0.5)",
+    blockHighlight: "rgba(255, 224, 160, 0.14)",
+    hudScore: "#ffb000",
+    hudLevel: "#a8741f",
+    hudLives: "#ffb000",
+    pauseText: "#ffcf6b",
+    pauseSub: "rgba(255, 176, 0, 0.6)",
+    glow: 0,
+    blocks: {
+      red: "#ffb000",
+      yellow: "#ffca57",
+      cyan: "#d68f2c",
+      magenta: "#e6a53a",
+      hotpink: "#ffdc94",
+      green: "#bd7d22",
+      gray: "#8a5c1b",
+    },
+  },
+};
 interface BlockCell {
   col: number;
   row: number;
@@ -108,7 +194,7 @@ interface Block {
   y: number;
   w: number;
   h: number;
-  color: string; // hex de la paleta neon
+  colorKey: BlockColorKey; // clave de rol; el tono lo pone la skin activa
   alive: boolean;
 }
 interface Burst {
@@ -116,7 +202,7 @@ interface Burst {
   y: number;
   w: number;
   h: number;
-  color: string;
+  colorKey: BlockColorKey;
   elapsed: number; // ms
 }
 export class ArkanoidGame {
@@ -134,6 +220,9 @@ export class ArkanoidGame {
   private lives = 3;
   private currentLevel = 1;
   private state: GameState = "playing";
+  // Skin activa. Solo afecta al render; se cambia al vuelo con setSkin() sin
+  // reiniciar la partida ni tocar la puntuación.
+  private skin: SkinName = "clasico";
   // Aviso de fin de partida al envoltorio React (una sola vez por partida).
   private onGameOver: ((result: GameOverResult) => void) | null = null;
   private gameOverNotified = false;
@@ -179,6 +268,10 @@ export class ArkanoidGame {
   // última vida o al limpiar todos los bloques del nivel 5.
   setOnGameOver(cb: (result: GameOverResult) => void): void {
     this.onGameOver = cb;
+  }
+  // Cambia la skin al vuelo. No reinicia la partida ni afecta a la puntuación.
+  setSkin(name: SkinName): void {
+    this.skin = name;
   }
   // Pausa lógica: el loop sigue pintando, pero no actualiza.
   setPaused(paused: boolean): void {
@@ -238,7 +331,7 @@ export class ArkanoidGame {
       y: BLOCKS_ORIGIN_Y + b.row * BLOCK_H,
       w: BLOCK_W,
       h: BLOCK_H,
-      color: NEON[b.color] ?? "#c7d0e0",
+      colorKey: (b.color as BlockColorKey) ?? "gray",
       alive: true,
     }));
     this.bursts = [];
@@ -316,7 +409,7 @@ export class ArkanoidGame {
           y: block.y,
           w: block.w,
           h: block.h,
-          color: block.color,
+          colorKey: block.colorKey,
           elapsed: 0,
         });
         this.score += POINTS_PER_BLOCK;
@@ -347,29 +440,32 @@ export class ArkanoidGame {
     }
   }
   // ── Draw ───────────────────────────────────────────────────────────────────
-  private drawBlock(b: Block): void {
+  private drawBlock(b: Block, pal: ArkanoidPalette): void {
     const { ctx } = this;
-    ctx.fillStyle = b.color;
+    ctx.fillStyle = pal.blocks[b.colorKey];
+    ctx.shadowColor = pal.blocks[b.colorKey];
+    ctx.shadowBlur = pal.glow;
     ctx.fillRect(b.x + 1, b.y + 1, b.w - 2, b.h - 2);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.16)";
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = pal.blockHighlight;
     ctx.fillRect(b.x + 1, b.y + 1, b.w - 2, 4);
   }
-  private drawHud(): void {
+  private drawHud(pal: ArkanoidPalette): void {
     const { ctx } = this;
     ctx.font = `12px ${PIXEL_FONT}`;
     ctx.textBaseline = "top";
-    ctx.fillStyle = "#e6e9ff";
+    ctx.fillStyle = pal.hudScore;
     ctx.textAlign = "left";
     ctx.fillText(`SCORE ${this.score.toLocaleString("es-ES")}`, 12, 12);
     ctx.textAlign = "center";
-    ctx.fillStyle = "#8a8fb5";
+    ctx.fillStyle = pal.hudLevel;
     ctx.fillText(`NIVEL ${this.currentLevel}`, W / 2, 12);
     // Vidas como bolas pequeñas arriba a la derecha.
     const r = 5;
     const gap = 16;
     for (let i = 0; i < this.lives; i++) {
       const cx = W - 14 - i * gap;
-      ctx.fillStyle = "#00f5ff";
+      ctx.fillStyle = pal.hudLives;
       ctx.beginPath();
       ctx.arc(cx, 20, r, 0, Math.PI * 2);
       ctx.fill();
@@ -377,33 +473,40 @@ export class ArkanoidGame {
   }
   private draw(): void {
     const { ctx, paddle, ball } = this;
-    ctx.fillStyle = "#000";
+    const pal = ARKANOID_SKINS[this.skin];
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = pal.bg;
     ctx.fillRect(0, 0, W, H);
     // Línea de suelo sutil bajo la paleta.
-    ctx.strokeStyle = GRID_LINE;
+    ctx.strokeStyle = pal.floorLine;
     ctx.lineWidth = 1;
     ctx.beginPath();
     ctx.moveTo(0, paddle.y + paddle.h + 10);
     ctx.lineTo(W, paddle.y + paddle.h + 10);
     ctx.stroke();
     // Bloques.
-    for (const b of this.blocks) if (b.alive) this.drawBlock(b);
+    for (const b of this.blocks) if (b.alive) this.drawBlock(b, pal);
     // Destellos de ruptura.
     for (const b of this.bursts) {
       const t = b.elapsed / BURST_DURATION;
       const grow = t * 12;
       ctx.globalAlpha = Math.max(0, 1 - t);
-      ctx.fillStyle = b.color;
+      ctx.fillStyle = pal.blocks[b.colorKey];
       ctx.fillRect(b.x - grow, b.y - grow, b.w + grow * 2, b.h + grow * 2);
       ctx.globalAlpha = 1;
     }
     // Paleta.
-    ctx.fillStyle = "#00f5ff";
+    ctx.fillStyle = pal.paddle;
+    ctx.shadowColor = pal.paddle;
+    ctx.shadowBlur = pal.glow;
     ctx.fillRect(paddle.x, paddle.y, paddle.w, paddle.h);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.35)";
+    ctx.shadowBlur = 0;
+    ctx.fillStyle = pal.paddleHighlight;
     ctx.fillRect(paddle.x, paddle.y, paddle.w, 3);
     // Bola.
-    ctx.fillStyle = "#ffffff";
+    ctx.fillStyle = pal.ball;
+    ctx.shadowColor = pal.ball;
+    ctx.shadowBlur = pal.glow;
     ctx.beginPath();
     ctx.arc(
       ball.x + ball.w / 2,
@@ -413,15 +516,16 @@ export class ArkanoidGame {
       Math.PI * 2,
     );
     ctx.fill();
-    this.drawHud();
+    ctx.shadowBlur = 0;
+    this.drawHud(pal);
     if (this.paused && this.state !== "gameover") {
       ctx.textAlign = "center";
       ctx.textBaseline = "alphabetic";
-      ctx.fillStyle = "#fff";
+      ctx.fillStyle = pal.pauseText;
       ctx.font = `bold 30px ${PIXEL_FONT}`;
       ctx.fillText("EN PAUSA", W / 2, H / 2 - 12);
       ctx.font = `12px ${PIXEL_FONT}`;
-      ctx.fillStyle = "rgba(255,255,255,0.65)";
+      ctx.fillStyle = pal.pauseSub;
       ctx.fillText("ESC / P PARA CONTINUAR", W / 2, H / 2 + 16);
     }
     // El texto de GAME OVER / victoria lo pinta el overlay React del envoltorio.

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { submitScore } from "@/app/lib/scores-actions";
 import { ArkanoidGame, type GameOverResult, type TouchAction } from "./engine";
 import ArkanoidTouchControls from "./touch-controls";
+import SkinPicker from "../skin-picker";
+import { loadSkin, saveSkin, type SkinName } from "../skins";
 interface ArkanoidPlayerProps {
   title: string;
 }
@@ -24,6 +26,7 @@ export default function ArkanoidPlayer({ title }: ArkanoidPlayerProps) {
   const [name, setName] = useState("");
   const [phase, setPhase] = useState<SavePhase>("idle");
   const [errorMsg, setErrorMsg] = useState("");
+  const [skin, setSkin] = useState<SkinName>("clasico");
   useEffect(() => {
     const canvas = canvasRef.current;
     const stage = stageRef.current;
@@ -43,6 +46,9 @@ export default function ArkanoidPlayer({ title }: ArkanoidPlayerProps) {
       game.resize(rect.width, rect.height, window.devicePixelRatio || 1);
     };
     applySize();
+    const savedSkin = loadSkin(GAME_ID);
+    game.setSkin(savedSkin);
+    setSkin(savedSkin);
     game.start();
     const ro = new ResizeObserver(applySize);
     ro.observe(stage);
@@ -69,6 +75,11 @@ export default function ArkanoidPlayer({ title }: ArkanoidPlayerProps) {
   }, []);
   const handleInput = (action: TouchAction, pressed: boolean) => {
     gameRef.current?.setInput(action, pressed);
+  };
+  const handleSkin = (next: SkinName) => {
+    gameRef.current?.setSkin(next);
+    saveSkin(GAME_ID, next);
+    setSkin(next);
   };
   const handleRestart = () => {
     gameRef.current?.restart();
@@ -118,6 +129,7 @@ export default function ArkanoidPlayer({ title }: ArkanoidPlayerProps) {
           <span>ARKANOID</span>
         </div>
       </div>
+      <SkinPicker gameId={GAME_ID} value={skin} onChange={handleSkin} />
       <div style={{ marginTop: 16 }}>
         <Link className="btn ghost" href="/juego/bloque-buster">
           VOLVER
