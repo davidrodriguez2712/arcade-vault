@@ -12,7 +12,7 @@ Current state: working platform. Pages: `/` home landing, `/biblioteca` catálog
 
 ## Workflow
 
-The project follows **Spec-Driven Design** using the `/spec` and `/spec-impl` commands from [Klerith/fernando-skills](https://github.com/Klerith/fernando-skills). Skills instaladas en `.claude/skills/` (`spec`, `spec-impl`, `ui-ux-pro-max`, `add-game`) y `.agents/skills/`. Reinstalar/actualizar con:
+The project follows **Spec-Driven Design** using the `/spec` and `/spec-impl` commands from [Klerith/fernando-skills](https://github.com/Klerith/fernando-skills). Skills instaladas en `.claude/skills/` (`spec`, `spec-impl`, `ui-ux-pro-max`, `add-game`, `spec-impl-game`) y `.agents/skills/`. Reinstalar/actualizar con:
 
 ```bash
 npx skills@latest add Klerith/fernando-skills
@@ -52,6 +52,7 @@ No test runner is configured.
 - `/frontend-design` — úsalo siempre para diseñar la interfaz de usuario. `/ui-ux-pro-max` para intel de UI/UX (estilos, paletas, tipografías, guías).
 - `/spec` + `/spec-impl` — Spec-Driven Design (redactar spec → aprobación → implementar).
 - `/add-game` (`.claude/skills/add-game/`) — añade un juego nuevo con su leaderboard: redacta la spec `NN-slug.md` (motor + tabla `scores` + cableado), espera aprobación, y la implementa paso a paso. El juego puede portarse desde `references/started-games/` o hacerse desde cero.
+- `/spec-impl-game` (`.claude/skills/spec-impl-game/`) — como `/spec-impl` para una spec de juego ya aprobada: implementa paso a paso y, tras verificar y commitear, encadena `skin-designer` y luego `mobile-porter` sobre ese `game-id`, en secuencia (nunca en paralelo). Si la spec no es de juego, se comporta como `/spec-impl`.
 
 ## Agents
 

@@ -1,6 +1,9 @@
 # Juegos implementados — Arcade Vault
 
-Estado a fecha 2026-08-29. Fuente: tabla `public.games` de Supabase.
+Estado a fecha 2026-08-30. Fuente: tabla `public.games` de Supabase.
+
+Con motor real (jugables + leaderboard): `rocas`, `caida`, `bloque-buster`,
+`serpentina`, `ranaria` (Frogger, SPEC 11). El resto son fichas simuladas.
 
 | ID              | Título        | Categoría | Color   | Descripción breve                                   |
 | --------------- | ------------- | --------- | ------- | --------------------------------------------------- |
