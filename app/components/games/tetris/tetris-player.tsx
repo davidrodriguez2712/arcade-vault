@@ -3,11 +3,19 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { submitScore } from "@/app/lib/scores-actions";
 import { TetrisGame, type GameOverResult, type TouchAction } from "./engine";
-import TetrisTouchControls from "./touch-controls";
+import MobileGamepad, { type PadControl } from "../mobile-gamepad";
 interface TetrisPlayerProps {
   title: string;
 }
 const GAME_ID = "caida";
+const PAD_MAP: Partial<Record<PadControl, TouchAction>> = {
+  left: "left",
+  right: "right",
+  down: "down",
+  up: "rotate",
+  a: "drop",
+  b: "rotate",
+};
 const SCROLL_KEYS = [
   "ArrowUp",
   "ArrowDown",
@@ -102,7 +110,12 @@ export default function TetrisPlayer({ title }: TetrisPlayerProps) {
     }
   };
   return (
-    <div className="av-player fade-in">
+    <div className="av-player av-player--game fade-in">
+      <div className="game-topbar">
+        <Link className="btn ghost" href="/juego/caida">
+          VOLVER
+        </Link>
+      </div>
       <div className="crt">
         <div className="crt-screen">
           <div className="tetris-stage" ref={stageRef}>
@@ -113,7 +126,6 @@ export default function TetrisPlayer({ title }: TetrisPlayerProps) {
               height={600}
             />
           </div>
-          <TetrisTouchControls onInput={handleInput} />
         </div>
         <div className="crt-bottom">
           <span className="led">SEÑAL OK</span>
@@ -121,7 +133,8 @@ export default function TetrisPlayer({ title }: TetrisPlayerProps) {
           <span>TETRIS</span>
         </div>
       </div>
-      <div style={{ marginTop: 16 }}>
+      <MobileGamepad map={PAD_MAP} onInput={handleInput} label="TETRIS" />
+      <div className="desktop-only-back" style={{ marginTop: 16 }}>
         <Link className="btn ghost" href="/juego/caida">
           VOLVER
         </Link>
