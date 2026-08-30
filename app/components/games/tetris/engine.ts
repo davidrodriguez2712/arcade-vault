@@ -66,8 +66,15 @@ const PIECES: number[][][] = [
   ], // L
 ];
 const GRID_LINE = "rgba(0, 245, 255, 0.18)";
+const PANEL_SEP = "rgba(230, 233, 255, 0.14)";
 const PIXEL_FONT = '"Press Start 2P", monospace';
 const MONO_FONT = '"JetBrains Mono", "Courier New", monospace';
+// Strings de estilo compuestos una sola vez (nunca por frame).
+const LABEL_FONT = `9px ${PIXEL_FONT}`;
+const VALUE_FONT = `20px ${MONO_FONT}`;
+const PAUSE_FONT = `bold 30px ${MONO_FONT}`;
+const PAUSE_SUB_FONT = `13px ${MONO_FONT}`;
+const CELL_HILITE = "rgba(255, 255, 255, 0.14)";
 // ¿El foco está en un campo de formulario? Para no capturar el teclado del juego
 // mientras el jugador escribe sus iniciales en el overlay de fin de partida.
 const isFormFieldFocused = (target: EventTarget | null): boolean => {
@@ -101,6 +108,21 @@ export class TetrisGame {
   private rafId: number | null = null;
   private lastTime: number | null = null;
   private paused = false;
+  // Capa estática (fondo negro + rejilla + separador del panel) cacheada en un
+  // canvas interno a la resolución del backing store; se vuelca con un único
+  // drawImage por frame y solo se reconstruye cuando cambia el tamaño en píxeles.
+  private staticLayer: HTMLCanvasElement | null = null;
+  private staticW = 0;
+  private staticH = 0;
+  private tsx = 1; // escala X del backing store (pxW / W)
+  private tsy = 1; // escala Y del backing store (pxH / H)
+  // Strings de HUD cacheados: se recomponen solo cuando cambia su valor.
+  private scoreStr = "0";
+  private linesStr = "0";
+  private levelStr = "1";
+  private shownScore = -1;
+  private shownLines = -1;
+  private shownLevel = -1;
   // Estado de partida (antes globales en game.js). Se inicializa en initGame().
   private board: number[][] = [];
   private current!: Piece;
@@ -188,7 +210,54 @@ export class TetrisGame {
     if (this.canvas.width !== pxW) this.canvas.width = pxW;
     if (this.canvas.height !== pxH) this.canvas.height = pxH;
     // Asignar width/height resetea la transform: se reaplica siempre.
-    this.ctx.setTransform(pxW / W, 0, 0, pxH / H, 0, 0);
+    this.tsx = pxW / W;
+    this.tsy = pxH / H;
+    this.ctx.setTransform(this.tsx, 0, 0, this.tsy, 0, 0);
+    if (this.staticW !== pxW || this.staticH !== pxH) {
+      this.staticW = pxW;
+      this.staticH = pxH;
+      this.buildStaticLayer(pxW, pxH);
+    }
+  }
+  // Rasteriza la capa estática (fondo + rejilla + separador) a la misma
+  // resolución y con la misma transform que el canvas principal, de modo que el
+  // volcado posterior es una copia 1:1 sin reescalado (pixel a pixel idéntico).
+  private buildStaticLayer(pxW: number, pxH: number): void {
+    let lc = this.staticLayer;
+    if (!lc) {
+      lc = document.createElement("canvas");
+      this.staticLayer = lc;
+    }
+    lc.width = pxW;
+    lc.height = pxH;
+    const g = lc.getContext("2d");
+    if (!g) {
+      this.staticLayer = null;
+      return;
+    }
+    g.setTransform(pxW / W, 0, 0, pxH / H, 0, 0);
+    g.fillStyle = "#000";
+    g.fillRect(0, 0, W, H);
+    g.strokeStyle = GRID_LINE;
+    g.lineWidth = 0.5;
+    for (let c = 1; c < COLS; c++) {
+      g.beginPath();
+      g.moveTo(c * BLOCK, 0);
+      g.lineTo(c * BLOCK, ROWS * BLOCK);
+      g.stroke();
+    }
+    for (let r = 1; r < ROWS; r++) {
+      g.beginPath();
+      g.moveTo(0, r * BLOCK);
+      g.lineTo(COLS * BLOCK, r * BLOCK);
+      g.stroke();
+    }
+    g.strokeStyle = PANEL_SEP;
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(PANEL_X + 0.5, 0);
+    g.lineTo(PANEL_X + 0.5, H);
+    g.stroke();
   }
   // Entrada de los botones táctiles. Las acciones de flanco (todas menos 'down')
   // se traducen a una pulsación de tecla en el flanco de subida.
@@ -397,71 +466,68 @@ export class TetrisGame {
   ): void {
     if (!colorIndex) return;
     const { ctx } = this;
-    ctx.globalAlpha = alpha;
+    if (alpha !== 1) ctx.globalAlpha = alpha;
     ctx.fillStyle = COLORS[colorIndex];
     ctx.fillRect(px + 1, py + 1, size - 2, size - 2);
-    ctx.fillStyle = "rgba(255, 255, 255, 0.14)";
+    ctx.fillStyle = CELL_HILITE;
     ctx.fillRect(px + 1, py + 1, size - 2, 4);
-    ctx.globalAlpha = 1;
+    if (alpha !== 1) ctx.globalAlpha = 1;
   }
-  private drawGrid(): void {
-    const { ctx } = this;
-    ctx.strokeStyle = GRID_LINE;
-    ctx.lineWidth = 0.5;
-    for (let c = 1; c < COLS; c++) {
-      ctx.beginPath();
-      ctx.moveTo(c * BLOCK, 0);
-      ctx.lineTo(c * BLOCK, ROWS * BLOCK);
-      ctx.stroke();
-    }
-    for (let r = 1; r < ROWS; r++) {
-      ctx.beginPath();
-      ctx.moveTo(0, r * BLOCK);
-      ctx.lineTo(COLS * BLOCK, r * BLOCK);
-      ctx.stroke();
-    }
-  }
-  private drawPiece(piece: Piece, alpha = 1): void {
-    for (let r = 0; r < piece.shape.length; r++) {
-      for (let c = 0; c < piece.shape[r].length; c++) {
-        if (piece.shape[r][c]) {
+  private drawShape(
+    shape: number[][],
+    x: number,
+    y: number,
+    alpha: number,
+  ): void {
+    for (let r = 0; r < shape.length; r++) {
+      const row = shape[r];
+      for (let c = 0; c < row.length; c++) {
+        if (row[c]) {
           this.paintCell(
-            (piece.x + c) * BLOCK,
-            (piece.y + r) * BLOCK,
+            (x + c) * BLOCK,
+            (y + r) * BLOCK,
             BLOCK,
-            piece.shape[r][c],
+            row[c],
             alpha,
           );
         }
       }
     }
   }
+  private drawStat(label: string, value: string, y: number): void {
+    const { ctx } = this;
+    const px = PANEL_X + 18;
+    ctx.textAlign = "left";
+    ctx.fillStyle = "#8a8fb5";
+    ctx.font = LABEL_FONT;
+    ctx.fillText(label, px, y);
+    ctx.fillStyle = "#e6e9ff";
+    ctx.font = VALUE_FONT;
+    ctx.fillText(value, px, y + 26);
+  }
   private drawPanel(): void {
     const { ctx } = this;
-    // Separador tablero / panel.
-    ctx.strokeStyle = "rgba(230, 233, 255, 0.14)";
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(PANEL_X + 0.5, 0);
-    ctx.lineTo(PANEL_X + 0.5, H);
-    ctx.stroke();
     const px = PANEL_X + 18;
-    const stat = (label: string, value: string, y: number) => {
-      ctx.textAlign = "left";
-      ctx.fillStyle = "#8a8fb5";
-      ctx.font = `9px ${PIXEL_FONT}`;
-      ctx.fillText(label, px, y);
-      ctx.fillStyle = "#e6e9ff";
-      ctx.font = `20px ${MONO_FONT}`;
-      ctx.fillText(value, px, y + 26);
-    };
-    stat("SCORE", this.score.toLocaleString("es-ES"), 40);
-    stat("LINES", String(this.lines), 112);
-    stat("LEVEL", String(this.level), 184);
+    // HUD: recompón los strings solo cuando su valor cambia.
+    if (this.shownScore !== this.score) {
+      this.shownScore = this.score;
+      this.scoreStr = this.score.toLocaleString("es-ES");
+    }
+    if (this.shownLines !== this.lines) {
+      this.shownLines = this.lines;
+      this.linesStr = String(this.lines);
+    }
+    if (this.shownLevel !== this.level) {
+      this.shownLevel = this.level;
+      this.levelStr = String(this.level);
+    }
+    this.drawStat("SCORE", this.scoreStr, 40);
+    this.drawStat("LINES", this.linesStr, 112);
+    this.drawStat("LEVEL", this.levelStr, 184);
     // NEXT
     ctx.textAlign = "left";
     ctx.fillStyle = "#8a8fb5";
-    ctx.font = `9px ${PIXEL_FONT}`;
+    ctx.font = LABEL_FONT;
     ctx.fillText("NEXT", px, 268);
     const pv = 22;
     const boxX = px - 2;
@@ -484,26 +550,33 @@ export class TetrisGame {
   }
   private draw(): void {
     const { ctx } = this;
-    ctx.fillStyle = "#000";
-    ctx.fillRect(0, 0, W, H);
-    this.drawGrid();
+    // Fondo + rejilla + separador: un único volcado 1:1 de la capa cacheada.
+    if (this.staticLayer) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(this.staticLayer, 0, 0);
+      ctx.setTransform(this.tsx, 0, 0, this.tsy, 0, 0);
+    } else {
+      ctx.fillStyle = "#000";
+      ctx.fillRect(0, 0, W, H);
+    }
     // Tablero fijado.
     for (let r = 0; r < ROWS; r++) {
+      const row = this.board[r];
       for (let c = 0; c < COLS; c++) {
-        this.paintCell(c * BLOCK, r * BLOCK, BLOCK, this.board[r][c]);
+        this.paintCell(c * BLOCK, r * BLOCK, BLOCK, row[c]);
       }
     }
     if (this.state === "playing") {
-      this.drawPiece({ ...this.current, y: this.ghostY() }, 0.18);
-      this.drawPiece(this.current);
+      this.drawShape(this.current.shape, this.current.x, this.ghostY(), 0.18);
+      this.drawShape(this.current.shape, this.current.x, this.current.y, 1);
     }
     this.drawPanel();
     if (this.paused && this.state !== "gameover") {
       ctx.textAlign = "center";
       ctx.fillStyle = "#fff";
-      ctx.font = `bold 30px ${MONO_FONT}`;
+      ctx.font = PAUSE_FONT;
       ctx.fillText("EN PAUSA", W / 2, H / 2 - 12);
-      ctx.font = `13px ${MONO_FONT}`;
+      ctx.font = PAUSE_SUB_FONT;
       ctx.fillStyle = "rgba(255,255,255,0.65)";
       ctx.fillText("ESC / P PARA CONTINUAR", W / 2, H / 2 + 16);
     }

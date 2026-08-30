@@ -17,6 +17,10 @@ const FRUITS_PER_TIER = 4;
 // Tramos de velocidad en celdas/s; interval = 1 / cps. Sube uno cada 4 frutas.
 const TIER_CELLS_PER_S = [7, 9, 11, 13, 15, 18];
 const PIXEL_FONT = '"Press Start 2P", monospace';
+// Strings de estilo compuestos: se resuelven una sola vez (nunca por frame).
+const HUD_FONT = `13px ${PIXEL_FONT}`;
+const PAUSE_TITLE_FONT = `bold 30px ${PIXEL_FONT}`;
+const PAUSE_SUB_FONT = `12px ${PIXEL_FONT}`;
 // ── Skins ────────────────────────────────────────────────────────────────────
 // Un rol de color por uso real del canvas. Ningún literal de color queda suelto
 // en los draw(): todo sale de SNAKE_SKINS[this.skin].<rol>. La fruta usa el
@@ -160,6 +164,17 @@ export class SnakeGame {
   // Spritesheet de frutas.
   private sprites: HTMLImageElement | null = null;
   private spritesReady = false;
+  // Capa estática (fondo + rejilla + regla del HUD) cacheada en un canvas
+  // interno a resolución de backing store. Se vuelca con un único drawImage por
+  // frame y solo se reconstruye en resize() o setSkin().
+  private staticCanvas: HTMLCanvasElement | null = null;
+  private staticCtx: CanvasRenderingContext2D | null = null;
+  private sx = 1; // escala del backing store: canvas.width / W
+  private sy = 1; // escala del backing store: canvas.height / H
+  // Textos del HUD cacheados: solo se recomponen al comer/reiniciar, no por frame.
+  private scoreText = "";
+  private lengthText = "";
+  private tierText = "";
   constructor(canvas: HTMLCanvasElement) {
     const ctx = canvas.getContext("2d");
     if (!ctx) throw new Error("No se pudo obtener el contexto 2D del canvas.");
@@ -208,7 +223,9 @@ export class SnakeGame {
   }
   // Cambia la skin al vuelo: no reinicia la partida ni toca la puntuación.
   setSkin(name: SkinName): void {
+    if (this.skin === name) return;
     this.skin = name;
+    this.buildStaticLayer();
   }
   // Pausa lógica: el loop sigue pintando, pero no actualiza.
   setPaused(paused: boolean): void {
@@ -231,10 +248,61 @@ export class SnakeGame {
     }
     const pxW = Math.max(1, Math.round(cw * dpr));
     const pxH = Math.max(1, Math.round(ch * dpr));
+    const changed = this.canvas.width !== pxW || this.canvas.height !== pxH;
     if (this.canvas.width !== pxW) this.canvas.width = pxW;
     if (this.canvas.height !== pxH) this.canvas.height = pxH;
+    this.sx = pxW / W;
+    this.sy = pxH / H;
     // Asignar width/height resetea la transform: se reaplica siempre.
-    this.ctx.setTransform(pxW / W, 0, 0, pxH / H, 0, 0);
+    this.ctx.setTransform(this.sx, 0, 0, this.sy, 0, 0);
+    if (changed || !this.staticCanvas) this.buildStaticLayer();
+  }
+  // (Re)construye la capa estática a resolución de backing store. Barato y raro:
+  // solo en resize() y setSkin().
+  private buildStaticLayer(): void {
+    const pxW = this.canvas.width;
+    const pxH = this.canvas.height;
+    if (pxW < 1 || pxH < 1) return;
+    let sc = this.staticCanvas;
+    if (!sc) {
+      sc = document.createElement("canvas");
+      this.staticCanvas = sc;
+      this.staticCtx = sc.getContext("2d");
+    }
+    const sctx = this.staticCtx;
+    if (!sctx) {
+      this.staticCanvas = null;
+      return;
+    }
+    if (sc.width !== pxW) sc.width = pxW;
+    if (sc.height !== pxH) sc.height = pxH;
+    sctx.setTransform(pxW / W, 0, 0, pxH / H, 0, 0);
+    sctx.clearRect(0, 0, W, H);
+    this.paintBackground(sctx);
+  }
+  // Fondo + rejilla + regla del HUD. Idéntico al render inline previo; lo usan la
+  // capa cacheada y el camino de respaldo si no hubo canvas offscreen.
+  private paintBackground(c: CanvasRenderingContext2D): void {
+    const pal = SNAKE_SKINS[this.skin];
+    c.fillStyle = pal.bg;
+    c.fillRect(0, 0, W, H);
+    c.strokeStyle = pal.grid;
+    c.lineWidth = 1;
+    c.beginPath();
+    for (let col = 0; col <= COLS; col++) {
+      c.moveTo(col * CELL, HUD_H);
+      c.lineTo(col * CELL, H);
+    }
+    for (let row = 0; row <= ROWS; row++) {
+      c.moveTo(0, HUD_H + row * CELL);
+      c.lineTo(W, HUD_H + row * CELL);
+    }
+    c.stroke();
+    c.strokeStyle = pal.hudRule;
+    c.beginPath();
+    c.moveTo(0, HUD_H);
+    c.lineTo(W, HUD_H);
+    c.stroke();
   }
   // Entrada de los botones táctiles. Fija la dirección (no sostenida): solo se
   // actúa en el flanco de subida.
@@ -257,7 +325,8 @@ export class SnakeGame {
   // puede reversar sobre el cuello).
   private queueDir(col: number, row: number): void {
     if (col === -this.dir.col && row === -this.dir.row) return;
-    this.nextDir = { col, row };
+    this.nextDir.col = col;
+    this.nextDir.row = row;
   }
   // ── Partida ────────────────────────────────────────────────────────────────
   private initGame(): void {
@@ -267,8 +336,10 @@ export class SnakeGame {
     for (let i = 0; i < START_LEN; i++) {
       this.snake.push({ col: startCol - i, row: midRow });
     }
-    this.dir = { col: 1, row: 0 };
-    this.nextDir = { col: 1, row: 0 };
+    this.dir.col = 1;
+    this.dir.row = 0;
+    this.nextDir.col = 1;
+    this.nextDir.row = 0;
     this.score = 0;
     this.fruitsEaten = 0;
     this.tier = 1;
@@ -278,18 +349,46 @@ export class SnakeGame {
     this.paused = false;
     this.tickAccum = 0;
     this.placeFruit();
+    this.refreshHudText();
   }
+  // ¿Alguna celda de la serpiente ocupa (col,row)? Bucle plano, sin closures.
+  private snakeOccupies(col: number, row: number): boolean {
+    const snake = this.snake;
+    for (let i = 0; i < snake.length; i++) {
+      if (snake[i].col === col && snake[i].row === row) return true;
+    }
+    return false;
+  }
+  // Coloca la fruta en una celda libre al azar. Recorre el tablero en el mismo
+  // orden que antes (col externa, fila interna) y consume exactamente un
+  // Math.random(): selección idéntica al algoritmo previo, sin array temporal.
   private placeFruit(): void {
-    const free: Cell[] = [];
+    let count = 0;
     for (let c = 0; c < COLS; c++) {
       for (let r = 0; r < ROWS; r++) {
-        if (!this.snake.some((s) => s.col === c && s.row === r)) {
-          free.push({ col: c, row: r });
+        if (!this.snakeOccupies(c, r)) count++;
+      }
+    }
+    if (count === 0) return; // tablero lleno: la partida ya habría acabado
+    let target = Math.floor(Math.random() * count);
+    for (let c = 0; c < COLS; c++) {
+      for (let r = 0; r < ROWS; r++) {
+        if (!this.snakeOccupies(c, r)) {
+          if (target === 0) {
+            this.fruit.col = c;
+            this.fruit.row = r;
+            return;
+          }
+          target--;
         }
       }
     }
-    if (free.length === 0) return; // tablero lleno: la partida ya habría acabado
-    this.fruit = free[Math.floor(Math.random() * free.length)];
+  }
+  // Recompone los strings del HUD. Solo cambian al comer o reiniciar.
+  private refreshHudText(): void {
+    this.scoreText = `SCORE ${this.score.toLocaleString("es-ES")}`;
+    this.lengthText = `LONGITUD ${this.snake.length}`;
+    this.tierText = `VEL. x${this.tier}`;
   }
   private endGame(): void {
     this.state = "gameover";
@@ -304,8 +403,13 @@ export class SnakeGame {
     // Aplicar el giro bufferizado, salvo que sea opuesto a la dirección actual.
     const opposite =
       this.nextDir.col === -this.dir.col && this.nextDir.row === -this.dir.row;
-    if (!opposite) this.dir = { col: this.nextDir.col, row: this.nextDir.row };
-    else this.nextDir = { col: this.dir.col, row: this.dir.row };
+    if (!opposite) {
+      this.dir.col = this.nextDir.col;
+      this.dir.row = this.nextDir.row;
+    } else {
+      this.nextDir.col = this.dir.col;
+      this.nextDir.row = this.dir.row;
+    }
     const head = this.snake[0];
     const nx = head.col + this.dir.col;
     const ny = head.row + this.dir.row;
@@ -316,10 +420,13 @@ export class SnakeGame {
     }
     // Choque con el cuerpo (la cola se va a mover, así que no cuenta salvo que se coma).
     const ate = nx === this.fruit.col && ny === this.fruit.row;
-    const body = ate ? this.snake : this.snake.slice(0, -1);
-    if (body.some((s) => s.col === nx && s.row === ny)) {
-      this.endGame();
-      return;
+    const bodyLen = ate ? this.snake.length : this.snake.length - 1;
+    for (let i = 0; i < bodyLen; i++) {
+      const s = this.snake[i];
+      if (s.col === nx && s.row === ny) {
+        this.endGame();
+        return;
+      }
     }
     this.snake.unshift({ col: nx, row: ny });
     if (ate) {
@@ -333,6 +440,7 @@ export class SnakeGame {
     } else {
       this.snake.pop();
     }
+    this.refreshHudText();
   }
   // ── Update ─────────────────────────────────────────────────────────────────
   private update(dt: number): void {
@@ -361,28 +469,6 @@ export class SnakeGame {
     ctx.arcTo(x, y + h, x, y, r);
     ctx.arcTo(x, y, x + w, y, r);
     ctx.closePath();
-  }
-  private drawGrid(): void {
-    const { ctx } = this;
-    const pal = SNAKE_SKINS[this.skin];
-    ctx.strokeStyle = pal.grid;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    for (let c = 0; c <= COLS; c++) {
-      ctx.moveTo(c * CELL, HUD_H);
-      ctx.lineTo(c * CELL, H);
-    }
-    for (let r = 0; r <= ROWS; r++) {
-      ctx.moveTo(0, HUD_H + r * CELL);
-      ctx.lineTo(W, HUD_H + r * CELL);
-    }
-    ctx.stroke();
-    // Regla separadora del HUD.
-    ctx.strokeStyle = pal.hudRule;
-    ctx.beginPath();
-    ctx.moveTo(0, HUD_H);
-    ctx.lineTo(W, HUD_H);
-    ctx.stroke();
   }
   private drawFruit(): void {
     const { ctx } = this;
@@ -428,39 +514,52 @@ export class SnakeGame {
     const pal = SNAKE_SKINS[this.skin];
     ctx.save();
     ctx.shadowBlur = pal.glow;
-    this.snake.forEach((seg, i) => {
+    const snake = this.snake;
+    const s = CELL - 4;
+    for (let i = 0; i < snake.length; i++) {
+      const seg = snake[i];
       const x = seg.col * CELL + 2;
       const y = HUD_H + seg.row * CELL + 2;
-      const s = CELL - 4;
-      const color = i === 0 ? pal.snakeHead : pal.snakeBody;
-      ctx.fillStyle = color;
-      ctx.shadowColor = color;
+      // Estilo por grupo: cabeza (i=0) una vez, cuerpo (i=1) una vez.
+      if (i === 0) {
+        ctx.fillStyle = pal.snakeHead;
+        ctx.shadowColor = pal.snakeHead;
+      } else if (i === 1) {
+        ctx.fillStyle = pal.snakeBody;
+        ctx.shadowColor = pal.snakeBody;
+      }
       this.roundRectPath(x, y, s, s, 6);
       ctx.fill();
-    });
+    }
     ctx.restore();
   }
   private drawHud(): void {
     const { ctx } = this;
     const pal = SNAKE_SKINS[this.skin];
-    ctx.font = `13px ${PIXEL_FONT}`;
+    ctx.font = HUD_FONT;
     ctx.textBaseline = "middle";
     ctx.textAlign = "left";
     ctx.fillStyle = pal.hudScore;
-    ctx.fillText(`SCORE ${this.score.toLocaleString("es-ES")}`, 12, HUD_H / 2);
+    ctx.fillText(this.scoreText, 12, HUD_H / 2);
     ctx.textAlign = "center";
     ctx.fillStyle = pal.hudLabel;
-    ctx.fillText(`LONGITUD ${this.snake.length}`, W / 2, HUD_H / 2);
+    ctx.fillText(this.lengthText, W / 2, HUD_H / 2);
     ctx.textAlign = "right";
     ctx.fillStyle = pal.hudAccent;
-    ctx.fillText(`VEL. x${this.tier}`, W - 12, HUD_H / 2);
+    ctx.fillText(this.tierText, W - 12, HUD_H / 2);
   }
   private draw(): void {
     const { ctx } = this;
     const pal = SNAKE_SKINS[this.skin];
-    ctx.fillStyle = pal.bg;
-    ctx.fillRect(0, 0, W, H);
-    this.drawGrid();
+    const staticLayer = this.staticCanvas;
+    if (staticLayer) {
+      // Vuelca la capa cacheada 1:1 sobre el backing store (sin escalado).
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(staticLayer, 0, 0);
+      ctx.setTransform(this.sx, 0, 0, this.sy, 0, 0);
+    } else {
+      this.paintBackground(ctx);
+    }
     this.drawFruit();
     this.drawSnake();
     this.drawHud();
@@ -468,9 +567,9 @@ export class SnakeGame {
       ctx.textAlign = "center";
       ctx.textBaseline = "alphabetic";
       ctx.fillStyle = pal.overlayTitle;
-      ctx.font = `bold 30px ${PIXEL_FONT}`;
+      ctx.font = PAUSE_TITLE_FONT;
       ctx.fillText("EN PAUSA", W / 2, H / 2 - 12);
-      ctx.font = `12px ${PIXEL_FONT}`;
+      ctx.font = PAUSE_SUB_FONT;
       ctx.fillStyle = pal.overlayDim;
       ctx.fillText("ESC / P PARA CONTINUAR", W / 2, H / 2 + 16);
     }

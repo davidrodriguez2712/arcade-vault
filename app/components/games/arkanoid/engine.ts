@@ -19,6 +19,10 @@ const BURST_DURATION = 150; // ms
 const POINTS_PER_BLOCK = 10;
 const MAX_LEVEL = 5;
 const PIXEL_FONT = '"Press Start 2P", monospace';
+// Strings de estilo compuestos: se arman una vez, nunca por frame.
+const FONT_HUD = `12px ${PIXEL_FONT}`;
+const FONT_PAUSE_TITLE = `bold 30px ${PIXEL_FONT}`;
+const FONT_PAUSE_SUB = `12px ${PIXEL_FONT}`;
 // ── Skins ────────────────────────────────────────────────────────────────────
 // Ningún literal de color vive en draw(): todo sale de ARKANOID_SKINS[skin].<rol>.
 // Las 6+1 claves de `blocks` son los nombres de color del referente (levels.js);
@@ -216,7 +220,18 @@ export class ArkanoidGame {
   private ball = { x: 0, y: 0, w: 16, h: 16, vx: 0, vy: 0 };
   private blocks: Block[] = [];
   private bursts: Burst[] = [];
+  private aliveBlocks = 0; // contador vivo, evita blocks.every() por golpe
   private score = 0;
+  // Texto SCORE cacheado: se recompone solo cuando cambia la puntuación.
+  private scoreText = "";
+  private scoreTextFor = -1;
+  // Cache de la capa estática (fondo + línea de suelo) en un canvas interno.
+  // Se invalida solo en resize() y setSkin().
+  private bgCanvas: HTMLCanvasElement | null = null;
+  private bgCtx: CanvasRenderingContext2D | null = null;
+  private pxW = 0;
+  private pxH = 0;
+  private staticDirty = true;
   private lives = 3;
   private currentLevel = 1;
   private state: GameState = "playing";
@@ -272,6 +287,7 @@ export class ArkanoidGame {
   // Cambia la skin al vuelo. No reinicia la partida ni afecta a la puntuación.
   setSkin(name: SkinName): void {
     this.skin = name;
+    this.staticDirty = true;
   }
   // Pausa lógica: el loop sigue pintando, pero no actualiza.
   setPaused(paused: boolean): void {
@@ -298,6 +314,33 @@ export class ArkanoidGame {
     if (this.canvas.height !== pxH) this.canvas.height = pxH;
     // Asignar width/height resetea la transform: se reaplica siempre.
     this.ctx.setTransform(pxW / W, 0, 0, pxH / H, 0, 0);
+    this.pxW = pxW;
+    this.pxH = pxH;
+    this.staticDirty = true;
+  }
+  // Reconstruye la capa estática (fondo + línea de suelo) en el canvas interno,
+  // al tamaño del backing store y con la misma transform que el canvas visible.
+  private rebuildStatic(): void {
+    if (this.pxW <= 0 || this.pxH <= 0) return;
+    if (!this.bgCanvas) {
+      this.bgCanvas = document.createElement("canvas");
+      this.bgCtx = this.bgCanvas.getContext("2d");
+    }
+    const g = this.bgCtx;
+    if (!g || !this.bgCanvas) return;
+    const pal = ARKANOID_SKINS[this.skin];
+    this.bgCanvas.width = this.pxW;
+    this.bgCanvas.height = this.pxH;
+    g.setTransform(this.pxW / W, 0, 0, this.pxH / H, 0, 0);
+    g.fillStyle = pal.bg;
+    g.fillRect(0, 0, W, H);
+    g.strokeStyle = pal.floorLine;
+    g.lineWidth = 1;
+    g.beginPath();
+    g.moveTo(0, this.paddle.y + this.paddle.h + 10);
+    g.lineTo(W, this.paddle.y + this.paddle.h + 10);
+    g.stroke();
+    this.staticDirty = false;
   }
   // Entrada de los botones táctiles. `left` / `right` son booleanos sostenidos
   // que se combinan con las flechas en update().
@@ -334,7 +377,8 @@ export class ArkanoidGame {
       colorKey: (b.color as BlockColorKey) ?? "gray",
       alive: true,
     }));
-    this.bursts = [];
+    this.aliveBlocks = this.blocks.length;
+    this.bursts.length = 0;
     this.initBall();
   }
   private initGame(): void {
@@ -400,10 +444,12 @@ export class ArkanoidGame {
       ball.vy = -Math.abs(ball.vy);
     }
     // Colisión con bloques: como en el referente, un bloque por frame.
-    for (const block of this.blocks) {
+    for (let i = 0; i < this.blocks.length; i++) {
+      const block = this.blocks[i];
       if (!block.alive) continue;
       if (this.collideAABB(block)) {
         block.alive = false;
+        this.aliveBlocks--;
         this.bursts.push({
           x: block.x,
           y: block.y,
@@ -414,7 +460,7 @@ export class ArkanoidGame {
         });
         this.score += POINTS_PER_BLOCK;
         ball.vy = -ball.vy;
-        if (this.blocks.every((b) => !b.alive)) {
+        if (this.aliveBlocks <= 0) {
           if (this.currentLevel < MAX_LEVEL) {
             this.loadLevel(this.currentLevel + 1); // conserva el score
           } else {
@@ -425,9 +471,18 @@ export class ArkanoidGame {
         break;
       }
     }
-    // Destellos de ruptura.
-    for (const b of this.bursts) b.elapsed += dt * 1000;
-    this.bursts = this.bursts.filter((b) => b.elapsed < BURST_DURATION);
+    // Destellos de ruptura: avanza el reloj y descarta los agotados in situ,
+    // manteniendo el orden (el blend de los destellos depende del orden de pintado).
+    let write = 0;
+    for (let i = 0; i < this.bursts.length; i++) {
+      const b = this.bursts[i];
+      b.elapsed += dt * 1000;
+      if (b.elapsed < BURST_DURATION) {
+        if (write !== i) this.bursts[write] = b;
+        write++;
+      }
+    }
+    if (write !== this.bursts.length) this.bursts.length = write;
     // Bola perdida por abajo.
     if (ball.y > H) {
       this.lives--;
@@ -452,11 +507,15 @@ export class ArkanoidGame {
   }
   private drawHud(pal: ArkanoidPalette): void {
     const { ctx } = this;
-    ctx.font = `12px ${PIXEL_FONT}`;
+    if (this.scoreTextFor !== this.score) {
+      this.scoreText = `SCORE ${this.score.toLocaleString("es-ES")}`;
+      this.scoreTextFor = this.score;
+    }
+    ctx.font = FONT_HUD;
     ctx.textBaseline = "top";
     ctx.fillStyle = pal.hudScore;
     ctx.textAlign = "left";
-    ctx.fillText(`SCORE ${this.score.toLocaleString("es-ES")}`, 12, 12);
+    ctx.fillText(this.scoreText, 12, 12);
     ctx.textAlign = "center";
     ctx.fillStyle = pal.hudLevel;
     ctx.fillText(`NIVEL ${this.currentLevel}`, W / 2, 12);
@@ -475,19 +534,30 @@ export class ArkanoidGame {
     const { ctx, paddle, ball } = this;
     const pal = ARKANOID_SKINS[this.skin];
     ctx.shadowBlur = 0;
-    ctx.fillStyle = pal.bg;
-    ctx.fillRect(0, 0, W, H);
-    // Línea de suelo sutil bajo la paleta.
-    ctx.strokeStyle = pal.floorLine;
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(0, paddle.y + paddle.h + 10);
-    ctx.lineTo(W, paddle.y + paddle.h + 10);
-    ctx.stroke();
+    // Capa estática (fondo + línea de suelo): un solo drawImage 1:1.
+    if (this.staticDirty) this.rebuildStatic();
+    if (this.bgCanvas && !this.staticDirty) {
+      ctx.setTransform(1, 0, 0, 1, 0, 0);
+      ctx.drawImage(this.bgCanvas, 0, 0);
+      ctx.setTransform(this.pxW / W, 0, 0, this.pxH / H, 0, 0);
+    } else {
+      ctx.fillStyle = pal.bg;
+      ctx.fillRect(0, 0, W, H);
+      ctx.strokeStyle = pal.floorLine;
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(0, paddle.y + paddle.h + 10);
+      ctx.lineTo(W, paddle.y + paddle.h + 10);
+      ctx.stroke();
+    }
     // Bloques.
-    for (const b of this.blocks) if (b.alive) this.drawBlock(b, pal);
+    for (let i = 0; i < this.blocks.length; i++) {
+      const b = this.blocks[i];
+      if (b.alive) this.drawBlock(b, pal);
+    }
     // Destellos de ruptura.
-    for (const b of this.bursts) {
+    for (let i = 0; i < this.bursts.length; i++) {
+      const b = this.bursts[i];
       const t = b.elapsed / BURST_DURATION;
       const grow = t * 12;
       ctx.globalAlpha = Math.max(0, 1 - t);
@@ -522,9 +592,9 @@ export class ArkanoidGame {
       ctx.textAlign = "center";
       ctx.textBaseline = "alphabetic";
       ctx.fillStyle = pal.pauseText;
-      ctx.font = `bold 30px ${PIXEL_FONT}`;
+      ctx.font = FONT_PAUSE_TITLE;
       ctx.fillText("EN PAUSA", W / 2, H / 2 - 12);
-      ctx.font = `12px ${PIXEL_FONT}`;
+      ctx.font = FONT_PAUSE_SUB;
       ctx.fillStyle = pal.pauseSub;
       ctx.fillText("ESC / P PARA CONTINUAR", W / 2, H / 2 + 16);
     }
