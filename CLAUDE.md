@@ -57,6 +57,7 @@ No test runner is configured.
 
 - `game-planner` (`.claude/agents/game-planner.md`) — decide **qué** juego añadir a continuación y si encaja con la plataforma (categoría, estética CRT, motor agnóstico, puntuación para el leaderboard). Mantiene su memoria de sugerencias en `references/game-suggestion-todo.md`. Entrega el handoff a `/add-game`; no escribe specs ni código.
 - `game-jam` (`.claude/agents/game-jam.md`) — dado un **tema**, elige 3 juegos que encajan con la plataforma y redacta por cada uno dos specs completas (`01` motor + `02` vitrina) en `specs/game-jam/<game-id>/`, en `Borrador`, para revisión humana. No implementa ni ejecuta `/add-game`; solo escribe los `.md` bajo `specs/game-jam/`.
+- `skin-designer` (`.claude/agents/skin-designer.md`) — implementa el sistema de skins en **un juego a la vez, solo el que se le indique** (nunca audita ni toca los demás). Le añade al menos 3 skins (`clasico` por defecto, `neon`, `retro`) como paleta `<NOMBRE>_SKINS` en `engine.ts` conmutable con `setSkin()`, más un `<SkinPicker>` en el envoltorio con la preferencia en `localStorage`. Mantiene el registro de qué juegos ya tienen skins en `references/game-skins.md`. Toca ese engine, su envoltorio y `app/globals.css`; no toca mecánica, puntuación, `scores`, `registry.ts` ni migraciones.
 
 ## The managed agent-rules block
 
